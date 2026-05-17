@@ -9,6 +9,15 @@ const app = express()
 const port = 3000
 app.use(express.json())
 
+if (
+    await fs
+        .access('./data.json')
+        .then(() => false)
+        .catch(() => true)
+) {
+    await fs.writeFile('./data.json', '[]')
+}
+
 // get schedule of today
 app.get('/today', async (_req, res) => {
     res.json(await fetchAllSchedule(new Date().toISOString().slice(0, 10)))
