@@ -1,19 +1,61 @@
-## SkemaBot
-This program is intended to be run on a server with the purpose of being a way for secondary bots to access the schedule of students in danish highschools.\
-It is not able to access the schedule of any student not loged in via the server on which this program runs.\
-When the server is running, it will be possible to access the combined schedule of every student stored on your server by running: `curl -X POST YOURIP/get -H "Content-Type: application/json" -d '{"date":"yy-mm-dd"}'`.\
-It is also possible to use the short hand `curl -X GET http://YOURIP/tomorrow -H "Content-Type: application/json"` for tomorrows schedule and `curl -X GET http://YOURIP/today -H "Content-Type: application/json"` for todays schedule.\
-To add students to your system, you need to run `curl -X POST http://YOURIP/addUser -H "Content-Type: application/json" -d '{"username":"user1234","password":"bamse1000"}'` replacing 'username' and 'password' with the UniLogin username and password of the student.
-## Known issues
-* Notes and homework will be attached to the class before the class they are supposed to. If the note/homework belongs to the first class of the day, the note/homework will be attached to the last class of the day.
+# SkemaBot
+SkemaBot is a server application that allows secondary bots and services to access the schedules of students at Danish high schools.\
+The system works by storing login sessions for students who have authenticated through the server. It cannot access schedules for students who have not been added to the system.
+## Features
+* Fetch combined schedules for all registered students
+* Simple REST API
+* Quick endpoints for today's and tomorrow's schedules
+* Supports adding users through API requests
+## API Usage
+### Get Schedule for a Specific Date
+```
+curl -X POST http://YOUR_IP/get \
+  -H "Content-Type: application/json" \
+  -d '{"date":"yy-mm-dd"}'
+```
+### Get Today's Schedule
+```
+curl -X GET http://YOUR_IP/today
+```
+### Get Tomorrow's Schedule
+```
+curl -X GET http://YOUR_IP/tomorrow
+```
+### Add Student
+To add students, you send their UniLogin credentials.
+```
+curl -X POST http://YOUR_IP/addUser \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user1234","password":"bamse1000"}'
+```
+Replace: `username` with the student's UniLogin username and `password` with the student's UniLogin password.
+## Known Issues
+* Notes and homework are currently attached to the class *before* the intended class. If it is the first class of the day, it is attached to the last class of the day.
 ## TODO
-* Create a config file for more control to the admin.
-	* A way of changing what school the program uses. Currently only 'Aarhus Tech'.
-	* A way of sorting subjects into groups like 'electives'.
-	* A way of declaring which subjects and groups doesn't require attendence.
-* Make a discord bot to make it possible to recieve notifications when the following day starts later than usual
-	* Have a way of notifying only the relevant people, incase, for example, an elective subject have been cancled.
-	* A way of declaring what time it is usual to meet each day.
-	* A way of declaring what dates there are no school and the bot there shouldn't notify.
-* Create a simple HTML website that allows students to enter their logins at the IP without needing admin interference.
-* Expand the system to include assignments.
+### Configuration System
+Create a configuration file to provide more control for administrators.\
+Planned features:\
+* Change which school the program uses\
+*(currently only supports Aarhus Tech)*
+* Sort subjects into groups such as electives
+* Declare which subjects or groups do not require attendance tracking
+### Discord Bot Integration
+Create a Discord bot for schedule notifications.\
+Planned features:
+* Notify students when the next school day starts later than usual
+* Send notifications only to relevant students\
+*(for example when an elective class is cancelled)*
+* Configure normal meeting times for each weekday, holidays and non-school dates to suppress excessive notifications
+### Web Interface
+Create a simple HTML web interface allowing any student to give the server their UniLogin credentials without needing to run terminal commands.
+### Assignment Support
+Create a similar tool to the schedule fetcher, that collects data about what assignments are due soon.\
+Planned features:\
+* An endpoint to get a list of assignments due after the point of fetching.
+	* The list should be sorted from closest to due date to furthest from due date.
+	* Each assignment should include due date, name, subject and student time
+* An endpoint to get a list of assignments due after the point of fetching with more information.
+	* The list should be sorted from closest to due date to furthest from due date.
+	* Each assignment should include due date, name, subject, student time, if there are groups, assignment description and any relevant files.
+* An endpoint to get info about an assignments of a given name.
+	* The info should inlcude due date, name, subject, student time, if there are groups, assignment description and any relevant files.
