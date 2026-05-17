@@ -34,7 +34,7 @@ app.post('/get', async (req, res) => {
 })
 
 // add user
-app.post('/get', async (req, res) => {
+app.post('/addUser', async (req, res) => {
     const { username, password } = req.body
     if (username && password) {
         const context = await (
