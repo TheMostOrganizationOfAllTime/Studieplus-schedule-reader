@@ -34,7 +34,7 @@ Replace: `username` with the student's UniLogin username and `password` with the
 ## TODO
 ### Configuration System
 Create a configuration file to provide more control for administrators.\
-Planned features:\
+Planned features:
 * Change which school the program uses\
 *(currently only supports Aarhus Tech)*
 * Sort subjects into groups such as electives
@@ -50,7 +50,7 @@ Planned features:
 Create a simple HTML web interface allowing any student to give the server their UniLogin credentials without needing to run terminal commands.
 ### Assignment Support
 Create a similar tool to the schedule fetcher, that collects data about what assignments are due soon.\
-Planned features:\
+Planned features:
 * An endpoint to get a list of assignments due after the point of fetching.
 	* The list should be sorted from closest to due date to furthest from due date.
 	* Each assignment should include due date, name, subject and student time
