@@ -9,8 +9,26 @@
 
 <body>
     <form>
-        <input placeholder="username" />
-        <input placeholder="password" />
-        <button>submit</button>
+        <input placeholder="username" id="username" />
+        <input placeholder="password" id="password" />
+        <button id="submit" type="button">submit</button>
     </form>
 </body>
+
+<script>
+    document.getElementById("submit").addEventListener("click", async () => {
+        const response = await fetch("/adduser", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                username: "albe5438",
+                password: "bCqk1y1aC77tY1a2HlRMzw",
+            }),
+        });
+
+        const text = await response.text();
+        alert(text);
+    });
+</script>

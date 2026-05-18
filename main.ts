@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import express from 'express'
 import fs from 'node:fs/promises'
+import path from 'node:path'
 import { chromium } from 'playwright'
 import { fetchAllSchedule, updateCookie } from './schedule.js'
 
@@ -17,6 +18,8 @@ if (
 ) {
     await fs.writeFile('./data.json', '[]')
 }
+
+app.use('/', express.static(path.join(import.meta.dirname, 'public')))
 
 // get schedule of today
 app.get('/today', async (_req, res) => {
@@ -73,19 +76,13 @@ app.post('/adduser', async (req, res) => {
             res.send('Login failed (Propably Invalid username or password)')
         }
         if (data) {
-            await fs.writeFile(
-                './data.json',
-                JSON.stringify(
-                    (JSON.parse((await fs.readFile('./data.json')).toString()) as Data[]).push(
-                        data,
-                    ),
-                ),
-            )
+            const fullData = JSON.parse((await fs.readFile('./data.json')).toString()) as Data[]
+            fullData.push(data)
+            await fs.writeFile('./data.json', JSON.stringify(fullData))
             res.status(200)
             res.send('Succesfully added user')
         }
         res.status(400)
-        res.send('You have succesfully reached an impossible Error, congrats!')
     } else {
         res.status(400)
         res.send('Invalid Body')
