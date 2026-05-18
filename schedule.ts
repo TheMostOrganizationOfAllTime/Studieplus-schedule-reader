@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import { chromium, type BrowserContext, type Page } from 'playwright'
-import { htmlToDiscord } from './discord.js'
+import { htmlToDiscord } from './discordformatting.js'
 
 export async function fetchAllSchedule(date: string) {
     const text = await fs.readFile('./data.json')
