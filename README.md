@@ -1,6 +1,6 @@
 # SkemaBot
 SkemaBot is a server application that allows secondary bots and services to access the schedules of students at Danish high schools.\
-The system works by storing login sessions for students who have authenticated through the server. It cannot access schedules for students who have not been added to the system.
+The system works by storing login sessions for students who have authenticated through the server. It cannot yet access schedules for students who have not been added to the system.
 ## Features
 * Fetch combined schedules for all registered students
 * Simple REST API
@@ -59,3 +59,9 @@ Planned features:
 	* Each assignment should include due date, name, subject, student time, if there are groups, assignment description and any relevant files.
 * An endpoint to get info about an assignments of a given name.
 	* The info should inlcude due date, name, subject, student time, if there are groups, assignment description and any relevant files.
+### Get Full School Schedule
+Whilst it is not allowed to search for or have access to the schedule of classes the student is not a part of. It is allowed to get the schedule of any classroom.
+* endpoints that goes through the schedule of every classroom in the school to get a full school schedule.
+	* The endpoints should include a filter for which classes and/or classrooms are relevant to reduce unuseful information.
+	* There is an endpoint for 'today', 'tomorrow' and a set date.
+* The configuration system should allow to set default classes to always include and the filters in the endpoints should filter from the list.
