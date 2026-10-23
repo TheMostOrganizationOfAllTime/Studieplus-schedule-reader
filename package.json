@@ -1,9 +1,12 @@
 {
-  "name": "studie-plus-schedule-reader",
+  "name": "studieplus-schedule-reader",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
+  "description": "Reads your Studie+ schedule",
   "scripts": {
-    "start": "tsx skema_fetch.ts",
-    "typecheck": "tsc --noEmit"
+    "start": "tsx cli.ts",
+    "check": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
