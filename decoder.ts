@@ -6,7 +6,7 @@
 // Everything in a lesson below is described in "file order" (the writer's order is the reverse).
 
 import { addDays, dateKey } from "./dates.ts";
-import { Lesson, ScheduleError, type Day } from "./Types.ts";
+import { Lesson, ScheduleError, type Day, type Room } from "./types.ts";
 
 /** Booking-type lessons carry two strings: a TYPE (Elevmøde, Eksamen, Forberedelse...) and a TITLE
  *  (a free text, or the subject for exams). For these types the TITLE is shown as the subject and the
@@ -185,18 +185,18 @@ export function decodeLessons(text: string): Lesson[] {
   // level (A/B/C):  ...,0,0,<id>,<Integer>,<level>,0,
   const levelRe = build(int, (n) => String.raw`,0,0,\d+,${n},(\d+),0,`);
   // remark = the string right before the first "group" entry; the token before the remark is the booking
-  // type (0 for normal lessons). A group entry is:  0,<name>,<HOLD|STAM|OVAK>,<id>,<x>,<AktiviteterISkema>
+  // type (0 for normal lessons). A group entry is:
+  //   <0 or -1>,<name>,<HOLD|STAM|OVAK>,<id>,<x>,<AktiviteterISkema>
   const remarkRe = build(
     akt,
-    (n) => String.raw`,(\d+),0,\d+,\d+,\d+,\d+,${n},`,
+    (n) => String.raw`,(\d+),-?\d+,\d+,\d+,\d+,\d+,${n},`,
   );
-  const remarkOldRe = build(arr, (n) => String.raw`,${n},0,0,0,0,(\d+),0,`);
   const chainRe = build(
     akt,
-    (n) => String.raw`(?:,0,\d+,\d+,\d+,\d+,${n})+`,
+    (n) => String.raw`(?:,-?\d+,\d+,\d+,\d+,\d+,${n})+`,
     "y",
   );
-  const entryRe = build(akt, (n) => String.raw`,0,(\d+),\d+,\d+,\d+,${n}`);
+  const entryRe = build(akt, (n) => String.raw`,-?\d+,(\d+),\d+,\d+,\d+,${n}`);
   const idRe = build(int, (n) => String.raw`,\d+,${n},(\d+),${n},`);
   const id7Re = build(int, (n) => String.raw`(?<![\d-])(\d{7,}),${n}(?!\d)`);
 
@@ -290,9 +290,6 @@ export function decodeLessons(text: string): Lesson[] {
           lesson.remark = title;
         }
       }
-    } else if (remarkOldRe) {
-      const old = execFrom(remarkOldRe, seg, after);
-      if (old) lesson.remark = str(old[1]).trim();
     }
 
     const extra = eventId === null ? undefined : notes.get(eventId);
@@ -308,6 +305,24 @@ export function decodeLessons(text: string): Lesson[] {
       a.start.getTime() - b.start.getTime() ||
       a.end.getTime() - b.end.getTime(),
   );
+}
+
+/** Reads the room info from a room schedule response (hentLokaSkemaData). Null if there is none.
+ *  The room record, in file order:
+ *    <label>,<capacity?>,0,"",<name>,<description>,"",<id>,0,<name>,0,<Lokale>,<id>,<Integer> */
+export function decodeRoom(text: string): Room | null {
+  if (!text.startsWith("//OK")) return null;
+  const table = readStringTable(text);
+  const lokale = indexOfClass(table, "dk.uddata.model.skema.Lokale/");
+  const int = indexOfClass(table, "java.lang.Integer");
+  if (lokale === null || int === null) return null;
+  const re = new RegExp(
+    String.raw`(?<![\d-])\d+,\d+,\d+,\d+,\d+,(\d+),\d+,(\d+),0,(\d+),0,${lokale},\d+,${int}(?!\d)`,
+  );
+  const m = re.exec(text);
+  if (!m) return null;
+  const str = (ref: string) => table[Number(ref) - 1] ?? "";
+  return { id: Number(m[2]), name: str(m[3]), description: str(m[1]) };
 }
 
 /** Groups a response into days.

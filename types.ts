@@ -37,6 +37,21 @@ export interface Day {
   lessons: Lesson[];
 }
 
+/** A classroom, as reported by Studie+. */
+export interface Room {
+  id: number;
+  /** "D4240" */
+  name: string;
+  /** "Salon", "Teorilokale", ... (may be empty) */
+  description: string;
+}
+
+/** One week of one room's schedule. */
+export interface RoomWeek {
+  room: Room;
+  days: Day[];
+}
+
 /** Settings read from config.json. */
 export interface Config {
   instnr: string;
