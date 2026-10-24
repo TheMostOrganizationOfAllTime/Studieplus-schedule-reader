@@ -40,10 +40,10 @@ export interface Day {
 /** A classroom, as reported by Studie+. */
 export interface Room {
   id: number;
-  /** "D4240" */
-  name: string;
-  /** "Salon", "Teorilokale", ... (may be empty) */
-  description: string;
+  /** "D4240". null if Studie+ sent no room info (invalid room id). */
+  name: string | null;
+  /** "Salon", "Teorilokale", ... null if none. */
+  description: string | null;
 }
 
 /** One week of one room's schedule. */

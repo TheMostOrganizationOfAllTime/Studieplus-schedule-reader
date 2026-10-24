@@ -152,8 +152,8 @@ export async function getRoomWeek(
     );
   const room = decodeRoom(text) ?? {
     id: roomId,
-    name: `#${roomId}`,
-    description: "",
+    name: null,
+    description: null,
   };
   return { room, days: parseSchedule(text, monday) };
 }

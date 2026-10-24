@@ -19,7 +19,8 @@ export function formatLesson(l: Lesson): string {
 
 /** "Room D4240 (Salon), id 950" */
 export function formatRoom(room: Room): string {
-  return `Room ${room.name}${room.description ? ` (${room.description})` : ""}, id ${room.id}`;
+  if (!room.name && !room.description) return `Room id ${room.id}`;
+  return `Room ${room.name ?? "?"}${room.description ? ` (${room.description})` : ""}, id ${room.id}`;
 }
 
 export function formatWeek(monday: Date, days: Day[], short = false): string {

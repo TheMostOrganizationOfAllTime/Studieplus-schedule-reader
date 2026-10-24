@@ -321,7 +321,7 @@ export function decodeRoom(text: string): Room | null {
   );
   const m = re.exec(text);
   if (!m) return null;
-  const str = (ref: string) => table[Number(ref) - 1] ?? "";
+  const str = (ref: string) => table[Number(ref) - 1]?.trim() || null;
   return { id: Number(m[2]), name: str(m[3]), description: str(m[1]) };
 }
 
