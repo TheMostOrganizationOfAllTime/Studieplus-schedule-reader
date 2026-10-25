@@ -1,3 +1,5 @@
 config.json
 raw_*.txt
 node_modules
+roomNames.json
+validRoomIds.json

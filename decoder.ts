@@ -18,8 +18,15 @@ const EXAM_TYPES = new Set(["Eksamen", "Forberedelse"]);
 const LESSON_RE =
   /(?<![\d-])(\d+),(\d+),(\d+),(\d+),(1\d\d),(\d+),(\d+),0,(\d+),(\d+),\3,\4,\5,\6,\7(?!\d)/g;
 
-const TABLE_RE =
-  /,\[("(?:[^"\\]|\\.)*"(?:,"(?:[^"\\]|\\.)*")*)\],\d+,\d+\]\s*$/;
+/** GWT splits strings longer than 65535 characters into pieces joined with "+", so one table entry is
+ *  "part1"+"part2"+... The table may also be empty. */
+const STR = String.raw`"(?:[^"\\]|\\.)*"`;
+const ITEM = `${STR}(?:\\+${STR})*`;
+const TABLE_RE = new RegExp(
+  String.raw`,\[((?:${ITEM}(?:,${ITEM})*)?)\],\d+,\d+\]\s*$`,
+);
+const ITEM_RE = new RegExp(ITEM, "gs");
+const PART_RE = new RegExp(STR, "gs");
 
 // ------------------------------------------------------------------ string table
 
@@ -54,8 +61,10 @@ function readStringTable(text: string): string[] {
     throw new ScheduleError(
       "Could not find the string table at the end of the response.",
     );
-  return [...match[1].matchAll(/"((?:[^"\\]|\\.)*)"/gs)].map((m) =>
-    unescapeGwt(m[1]),
+  return [...match[1].matchAll(ITEM_RE)].map((item) =>
+    [...item[0].matchAll(PART_RE)]
+      .map((part) => unescapeGwt(part[0].slice(1, -1)))
+      .join(""),
   );
 }
 
@@ -317,12 +326,17 @@ export function decodeRoom(text: string): Room | null {
   const int = indexOfClass(table, "java.lang.Integer");
   if (lokale === null || int === null) return null;
   const re = new RegExp(
-    String.raw`(?<![\d-])\d+,\d+,\d+,\d+,\d+,(\d+),\d+,(\d+),0,(\d+),0,${lokale},\d+,${int}(?!\d)`,
+    String.raw`(?<![\d-])\d+,\d+,\d+,\d+,(\d+),(\d+),\d+,(\d+),0,(\d+),0,${lokale},\d+,${int}(?!\d)`,
   );
   const m = re.exec(text);
   if (!m) return null;
   const str = (ref: string) => table[Number(ref) - 1]?.trim() || null;
-  return { id: Number(m[2]), name: str(m[3]), description: str(m[1]) };
+  // The name appears twice in the record; some rooms (e.g. "Virtuel T1") only have it in the first slot.
+  return {
+    id: Number(m[3]),
+    name: str(m[1]) ?? str(m[4]),
+    description: str(m[2]),
+  };
 }
 
 /** Groups a response into days.
