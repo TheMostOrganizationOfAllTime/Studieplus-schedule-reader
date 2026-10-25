@@ -11,7 +11,7 @@
 //   npm start -- --room 950            # the schedule of a room instead of your own (id from the request payload)
 //   npm start -- --fromClasses 24htce  # build schedule based on which classes the studen is a part of.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { getRoomWeek, getWeek, loadConfig } from "./api.ts";
 import {
@@ -23,8 +23,8 @@ import {
 } from "./dates.ts";
 import { decodeRoom, parseSchedule } from "./decoder.ts";
 import { formatRoom, formatWeek } from "./format.ts";
-import { dayFromJSON, Lesson, ScheduleError, type Day } from "./types.ts";
-import { compileAllSchedules } from "./scanner.ts";
+import { ScheduleError } from "./types.ts";
+import { compileAllSchedules, GetLocallyStoredSchedules } from "./scanner.ts";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
@@ -97,21 +97,11 @@ npm start -- --fromClasses 24htce,24vfcbiB # Build schedule based on which class
   const cfg = loadConfig();
   const firstMonday = mondayOf(day);
   if (values.fromClasses) {
-    await compileAllSchedules(cfg, new Date(), 2, values.fromClasses);
-    const schedule: Record<string, Lesson[]> = JSON.parse(
-      readFileSync(`${values.fromClasses}-Schedules.json`, "utf8"),
+    if (!existsSync("allSchedules.json"))
+      await compileAllSchedules(cfg, new Date(), 2);
+    console.log(
+      formatWeek(firstMonday, GetLocallyStoredSchedules(values.fromClasses)),
     );
-    const week: Day[] = [];
-    for (const date of Object.keys(schedule)) {
-      const parsed = parseIsoDate(date);
-      console.log(date + ": " + parsed);
-      if (!parsed) throw new ScheduleError("Invalid format");
-      week.push({ date: parsed, lessons: [] });
-      for (const lesson of schedule[date])
-        week[week.length - 1].lessons.push(Lesson.fromJSON(lesson));
-    }
-    week.sort((a, b) => (a.date > b.date ? 1 : -1));
-    console.log(formatWeek(firstMonday, week));
 
     return;
   }

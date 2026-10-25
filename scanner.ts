@@ -1,7 +1,7 @@
-import { Lesson, ScheduleError, type Config } from "./types.ts";
+import { Lesson, ScheduleError, type Config, type Day } from "./types.ts";
 import { decodeRoom } from "./decoder.ts";
 import { fetchRoomWeekText, getRoomWeek } from "./api.ts";
-import { addDays, dateKey, mondayOf } from "./dates.ts";
+import { addDays, dateKey, mondayOf, parseIsoDate } from "./dates.ts";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 
 export async function scanRooms(
@@ -147,39 +147,6 @@ export async function compileAllSchedules(
     Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker()),
   );
 
-  if (classes) {
-    const combined: Record<string, Lesson[]> = {};
-    const seen = new Map<string, Set<string>>();
-
-    for (const classes of Object.values(schedules)) {
-      for (const [dateKey, lessons] of Object.entries(classes)) {
-        combined[dateKey] ??= [];
-        seen.set(dateKey, seen.get(dateKey) ?? new Set());
-
-        for (const lesson of lessons) {
-          const signature = JSON.stringify([
-            lesson.start.getTime(),
-            lesson.end.getTime(),
-            lesson.subject,
-            lesson.level,
-          ]);
-
-          if (seen.get(dateKey)!.has(signature)) continue;
-
-          seen.get(dateKey)!.add(signature);
-          combined[dateKey].push(lesson);
-        }
-      }
-    }
-
-    for (const lessons of Object.values(combined)) {
-      lessons.sort((a, b) => a.start.getTime() - b.start.getTime());
-    }
-
-    writeFileSync(`${classes}-Schedules.json`, JSON.stringify(combined));
-    return;
-  }
-
   for (const classes of Object.values(schedules)) {
     for (const lessons of Object.values(classes)) {
       lessons.sort((a, b) => a.start.getTime() - b.start.getTime());
@@ -187,4 +154,50 @@ export async function compileAllSchedules(
   }
 
   writeFileSync("allSchedules.json", JSON.stringify(schedules));
+}
+
+export function GetLocallyStoredSchedules(classes: string[]): Day[] {
+  if (!existsSync("allSchedules.json"))
+    throw new ScheduleError("allSchedules.json has not been generated");
+  const allSchedules: Record<string, Record<string, Lesson[]>> = JSON.parse(
+    readFileSync("allSchedules.json", "utf8"),
+  );
+
+  const week: Day[] = [];
+
+  const seen = new Map<string, Set<string>>();
+  for (const cl of classes) {
+    for (const date of Object.keys(allSchedules[cl] ?? [])) {
+      seen.set(date, seen.get(date) ?? new Set());
+
+      const parsed = parseIsoDate(date);
+      if (!parsed)
+        throw new ScheduleError(
+          "allSchedules.json does not follow the correct date format",
+        );
+
+      let index: number = week.findIndex((d) => dateKey(d.date) === date);
+      if (index === -1) {
+        index = week.length;
+        week.push({ date: parsed, lessons: [] });
+      }
+
+      for (const lesson of allSchedules[cl][date]) {
+        const signature = JSON.stringify([
+          lesson.start,
+          lesson.end,
+          lesson.subject,
+          lesson.level,
+        ]);
+        if (seen.get(date)!.has(signature)) continue;
+        seen.get(date)!.add(signature);
+        week[index].lessons.push(Lesson.fromJSON(lesson));
+      }
+    }
+  }
+
+  week.sort((a, b) => (a.date > b.date ? 1 : -1));
+  for (const day of week)
+    day.lessons.sort((a, b) => (a.start >= b.start ? 1 : -1));
+  return week;
 }
