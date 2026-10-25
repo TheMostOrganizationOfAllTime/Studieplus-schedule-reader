@@ -1,15 +1,15 @@
 #!/usr/bin/env -S npx tsx
 // Fetch your Studie+ schedule and print it, so you can check it by eye.
 //
-//   npm start                                  # this week only (one network call)
-//   npm start -- --help                        # shows a list of command arguments
-//   npm start -- --weeks 4                     # this week + the next 3 (one call per week)
-//   npm start -- --from 2026-11-09             # start at the week containing that date
-//   npm start -- --raw                         # also save every raw response to raw_<date>.txt
-//   npm start -- --short                       # cut long notes/homework to 140 characters
-//   npm start -- --file resp.txt               # decode a saved response (no network)
-//   npm start -- --room 950                    # the schedule of a room instead of your own (id from the request payload)
-//   npm start -- --fromClasses 24htce,24vfcbiB # build schedule based on which classes the studen is a part of.
+//   npm start                          # this week only (one network call)
+//   npm start -- --help                # shows a list of command arguments
+//   npm start -- --weeks 4             # this week + the next 3 (one call per week)
+//   npm start -- --from 2026-11-09     # start at the week containing that date
+//   npm start -- --raw                 # also save every raw response to raw_<date>.txt
+//   npm start -- --short               # cut long notes/homework to 140 characters
+//   npm start -- --file resp.txt       # decode a saved response (no network)
+//   npm start -- --room 950            # the schedule of a room instead of your own (id from the request payload)
+//   npm start -- --fromClasses 24htce  # build schedule based on which classes the studen is a part of.
 
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -23,8 +23,8 @@ import {
 } from "./dates.ts";
 import { decodeRoom, parseSchedule } from "./decoder.ts";
 import { formatRoom, formatWeek } from "./format.ts";
-import { ScheduleError } from "./types.ts";
-import { scanRooms } from "./scanner.ts";
+import { dayFromJSON, Lesson, ScheduleError, type Day } from "./types.ts";
+import { compileAllSchedules } from "./scanner.ts";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
@@ -97,7 +97,21 @@ npm start -- --fromClasses 24htce,24vfcbiB # Build schedule based on which class
   const cfg = loadConfig();
   const firstMonday = mondayOf(day);
   if (values.fromClasses) {
-    await scanRooms(cfg, 769, 1323, true);
+    await compileAllSchedules(cfg, new Date(), 2, values.fromClasses);
+    const schedule: Record<string, Lesson[]> = JSON.parse(
+      readFileSync(`${values.fromClasses}-Schedules.json`, "utf8"),
+    );
+    const week: Day[] = [];
+    for (const date of Object.keys(schedule)) {
+      const parsed = parseIsoDate(date);
+      console.log(date + ": " + parsed);
+      if (!parsed) throw new ScheduleError("Invalid format");
+      week.push({ date: parsed, lessons: [] });
+      for (const lesson of schedule[date])
+        week[week.length - 1].lessons.push(Lesson.fromJSON(lesson));
+    }
+    week.sort((a, b) => (a.date > b.date ? 1 : -1));
+    console.log(formatWeek(firstMonday, week));
 
     return;
   }

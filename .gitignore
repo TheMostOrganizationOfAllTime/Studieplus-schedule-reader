@@ -3,3 +3,4 @@ raw_*.txt
 node_modules
 roomNames.json
 validRoomIds.json
+*Schedules.json

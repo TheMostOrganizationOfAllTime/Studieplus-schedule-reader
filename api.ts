@@ -50,6 +50,8 @@ export function loadConfig(): Config {
     utoken: text("utoken"),
     permutation: text("permutation"),
     strongName: text("strong_name"),
+    minRoomId: raw["minRoomId"] as number,
+    maxRoomId: raw["maxRoomId"] as number,
   };
 }
 
