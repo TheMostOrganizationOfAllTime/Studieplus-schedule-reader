@@ -24,7 +24,7 @@ import {
 import { decodeRoom, parseSchedule } from "./decoder.ts";
 import { formatRoom, formatWeek } from "./format.ts";
 import { ScheduleError } from "./types.ts";
-import { compileAllSchedules, GetLocallyStoredSchedules } from "./scanner.ts";
+import { compileAllSchedules, getLocallyStoredSchedules } from "./scanner.ts";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
@@ -100,7 +100,7 @@ npm start -- --fromClasses 24htce,24vfcbiB # Build schedule based on which class
     if (!existsSync("allSchedules.json"))
       await compileAllSchedules(cfg, new Date(), 2);
     console.log(
-      formatWeek(firstMonday, GetLocallyStoredSchedules(values.fromClasses)),
+      formatWeek(firstMonday, getLocallyStoredSchedules(values.fromClasses)),
     );
 
     return;

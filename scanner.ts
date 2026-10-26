@@ -156,7 +156,7 @@ export async function compileAllSchedules(
   writeFileSync("allSchedules.json", JSON.stringify(schedules));
 }
 
-export function GetLocallyStoredSchedules(classes: string[]): Day[] {
+export function getLocallyStoredSchedules(classes: string[]): Day[] {
   if (!existsSync("allSchedules.json"))
     throw new ScheduleError("allSchedules.json has not been generated");
   const allSchedules: Record<string, Record<string, Lesson[]>> = JSON.parse(

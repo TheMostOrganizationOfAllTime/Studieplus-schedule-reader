@@ -6,7 +6,12 @@
   "description": "Reads your Studie+ schedule",
   "scripts": {
     "start": "tsx cli.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "login": "tsx run-login.ts",
+    "login:headed": "tsx run-login.ts --headed --slow"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
