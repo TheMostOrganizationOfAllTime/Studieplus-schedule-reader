@@ -1,15 +1,4 @@
 #!/usr/bin/env -S npx tsx
-// Fetch your Studie+ schedule and print it, so you can check it by eye.
-//
-//   npm start                          # this week only (one network call)
-//   npm start -- --help                # shows a list of command arguments
-//   npm start -- --weeks 4             # this week + the next 3 (one call per week)
-//   npm start -- --from 2026-11-09     # start at the week containing that date
-//   npm start -- --raw                 # also save every raw response to raw_<date>.txt
-//   npm start -- --short               # cut long notes/homework to 140 characters
-//   npm start -- --file resp.txt       # decode a saved response (no network)
-//   npm start -- --room 950            # the schedule of a room instead of your own (id from the request payload)
-//   npm start -- --fromClasses 24htce  # build schedule based on which classes the studen is a part of.
 
 import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -38,19 +27,12 @@ async function main(): Promise<void> {
       file: { type: "string" },
       room: { type: "string" },
       fromClasses: { type: "string", multiple: true },
+      all: { type: "boolean", default: false },
     },
   });
 
   if (values.help) {
-    console.log(`npm start                                  # this week only (one network call)
-npm start -- --help                        # shows this text
-npm start -- --weeks 4                     # this week + the next 3 (one call per week)
-npm start -- --from 2026-11-09             # start at the week containing that date
-npm start -- --raw                         # also save every raw response to raw_<date>.txt
-npm start -- --short                       # cut long notes/homework to 140 characters
-npm start -- --file resp.txt               # decode a saved response (no network)
-npm start -- --room 950                    # the schedule of a room instead of your own (id from the request payload)
-npm start -- --fromClasses 24htce,24vfcbiB # Build schedule based on which classes the studen is a part of.`);
+    console.log(readFileSync("help.txt"));
     return;
   }
 
@@ -95,6 +77,10 @@ npm start -- --fromClasses 24htce,24vfcbiB # Build schedule based on which class
   }
 
   const cfg = loadConfig();
+  if (values.all) {
+    await compileAllSchedules(cfg, new Date(), 2);
+    return;
+  }
   const firstMonday = mondayOf(day);
   if (values.fromClasses) {
     if (!existsSync("allSchedules.json"))
