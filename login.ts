@@ -18,8 +18,6 @@ const OVERALL_TIMEOUT_MS = 90_000;
 // Default cookies are for AARHUS TECH
 const DEFAULT_INSTNR = "281075";
 
-const LOG = true;
-
 // ───────────────────────── config ─────────────────────────
 type Config = {
   username: string;
@@ -47,6 +45,17 @@ function saveConfig(patch: Partial<Config>) {
   );
 }
 
+// ───────────────────────── credential errors ─────────────────────────
+/** Thrown when Unilogin explicitly says the username or password is wrong (never retried). */
+export class InvalidCredentialsError extends ScheduleError {
+  readonly field: "username" | "password";
+  constructor(field: "username" | "password", message: string) {
+    super(message);
+    this.name = "InvalidCredentialsError";
+    this.field = field;
+  }
+}
+
 // ───────────────────────── logging ─────────────────────────
 let secrets: string[] = [];
 const redact = (s: string) =>
@@ -55,7 +64,6 @@ const mask = (v: string) => `${v.slice(0, 4)}… (${v.length} chars)`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function log(msg: string) {
-  if (!LOG) return;
   const line = redact(`[${new Date().toISOString().slice(11, 23)}] ${msg}`);
   console.log(line);
   fs.appendFileSync(LOG_FILE, line + "\n");
@@ -73,7 +81,6 @@ function short(u: string): string {
 
 let snapN = 0;
 async function snapshot(page: Page, label: string) {
-  if (!LOG) return;
   const base = path.join(
     DEBUG_DIR,
     `${String(++snapN).padStart(2, "0")}-${label}`,
@@ -97,7 +104,6 @@ async function snapshot(page: Page, label: string) {
 }
 
 async function logCookies(context: BrowserContext, label: string) {
-  if (!LOG) return;
   const cookies = await context.cookies();
   log(
     `COOKIES (${label}): ` +
@@ -127,6 +133,18 @@ async function detectState(page: Page): Promise<State> {
   return "unknown";
 }
 
+/**
+ * Unilogin marks a rejected username/password with a `.form-error` group that
+ * contains a `.form-error-message` ("Dit brugernavn blev ikke fundet",
+ * "Forkert adgangskode. Prøv igen"). Returns that text, or null if absent.
+ */
+async function readFieldError(page: Page): Promise<string | null> {
+  const el = page.locator(".form-group.form-error .form-error-message").first();
+  if (!(await el.isVisible().catch(() => false))) return null;
+  const text = await el.innerText().catch(() => "");
+  return text.replace(/\s+/g, " ").trim() || "(no message text)";
+}
+
 async function findUtoken(
   context: BrowserContext,
 ): Promise<Cookie | undefined> {
@@ -143,6 +161,8 @@ async function waitForChange(
   while (Date.now() < end) {
     await sleep(300);
     if (await findUtoken(context)) return;
+    // A rejected username/password re-renders the same page (same URL and state).
+    if (await readFieldError(page)) return;
     if (page.url() !== prevUrl) {
       await page.waitForLoadState("domcontentloaded").catch(() => {});
       return;
@@ -154,7 +174,7 @@ async function waitForChange(
 
 // ───────────────────────── the login flow ─────────────────────────
 export async function login(
-  opts: { headed?: boolean; slowMo?: number } = {},
+  opts: { headed?: boolean; slowMo?: number; log?: boolean } = {},
 ): Promise<void> {
   fs.rmSync(DEBUG_DIR, { recursive: true, force: true });
   fs.mkdirSync(DEBUG_DIR, { recursive: true });
@@ -164,42 +184,47 @@ export async function login(
   const instnr = cfg.instnr ?? DEFAULT_INSTNR;
   const headless = opts.headed ? false : cfg.headless !== false;
 
-  log(`START headless=${headless} instnr=${instnr} user="${cfg.username}"`);
+  if (opts.log)
+    log(`START headless=${headless} instnr=${instnr} user="${cfg.username}"`);
 
-  const browser = await chromium.launch({ headless, slowMo: opts.slowMo ?? 0 });
+  const browser = await chromium.launch({ headless, slowMo: opts.slowMo });
   const context = await browser.newContext({ locale: "da-DK" });
   const page = await context.newPage();
 
   // ── network / browser diagnostics ──
   page.on("framenavigated", (f) => {
-    if (f === page.mainFrame()) log(`NAV ${short(f.url())}`);
+    if (opts.log && f === page.mainFrame()) log(`NAV ${short(f.url())}`);
   });
   page.on("response", async (res) => {
     try {
       const req = res.request();
       const isDoc = req.resourceType() === "document";
       const loc = res.headers()["location"];
-      if (isDoc || res.status() >= 300)
+      if (opts.log && (isDoc || res.status() >= 300))
         log(
           `HTTP ${res.status()} ${req.method()} ${short(res.url())}${loc ? " -> " + short(loc) : ""}`,
         );
       const names = (await res.headersArray())
         .filter((h) => h.name.toLowerCase() === "set-cookie")
         .map((h) => h.value.split("=")[0]);
-      if (names.length)
+      if (opts.log && names.length)
         log(
           `  set-cookie [${names.join(", ")}] from ${new URL(res.url()).host}`,
         );
     } catch {}
   });
-  page.on("requestfailed", (r) =>
-    log(
-      `REQ FAILED ${r.method()} ${short(r.url())} ${r.failure()?.errorText ?? ""}`,
-    ),
-  );
-  page.on("pageerror", (e) => log(`PAGE ERROR ${e.message}`));
+  page.on("requestfailed", (r) => {
+    if (opts.log)
+      log(
+        `REQ FAILED ${r.method()} ${short(r.url())} ${r.failure()?.errorText ?? ""}`,
+      );
+  });
+  page.on("pageerror", (e) => {
+    if (opts.log) log(`PAGE ERROR ${e.message}`);
+  });
   page.on("console", (m) => {
-    if (m.type() === "error") log(`CONSOLE.ERROR ${m.text().slice(0, 200)}`);
+    if (opts.log && m.type() === "error")
+      log(`CONSOLE.ERROR ${m.text().slice(0, 200)}`);
   });
 
   try {
@@ -223,31 +248,47 @@ export async function login(
     while (Date.now() < deadline) {
       const token = await findUtoken(context);
       if (token) {
-        await snapshot(page, "success");
-        await logCookies(context, "at success");
-        log(
-          `UTOKEN found on ${token.domain}: ${mask(token.value)} expires=${token.expires > 0 ? new Date(token.expires * 1000).toISOString() : "session"}`,
-        );
+        if (opts.log) {
+          await snapshot(page, "success");
+          await logCookies(context, "at success");
+          log(
+            `UTOKEN found on ${token.domain}: ${mask(token.value)} expires=${token.expires > 0 ? new Date(token.expires * 1000).toISOString() : "session"}`,
+          );
+        }
         saveConfig({ utoken: token.value });
-        log("Saved utoken to config.json");
+        if (opts.log) log("Saved utoken to config.json");
         return;
       }
 
       const state = await detectState(page);
-      log(`STATE ${state} (${short(page.url())})`);
+      if (opts.log) log(`STATE ${state} (${short(page.url())})`);
 
       if (state === "unknown") {
         unknownTicks++;
-        if (unknownTicks === 6) await snapshot(page, "unknown");
+        if (opts.log && unknownTicks === 6) await snapshot(page, "unknown");
         await sleep(1000);
         continue;
+      }
+
+      if (state === "username" || state === "password") {
+        const fieldError = await readFieldError(page);
+        if (fieldError) {
+          if (opts.log) {
+            log(`REJECTED ${state}: "${fieldError}"`);
+            await snapshot(page, `rejected-${state}`);
+          }
+          throw new InvalidCredentialsError(
+            state,
+            `Unilogin rejected the ${state}: ${fieldError}`,
+          );
+        }
       }
 
       acted[state] = (acted[state] ?? 0) + 1;
       // The password is only ever submitted once, so a wrong password cannot lock the account.
       const limit = state === "password" ? 1 : 2;
       if (acted[state] > limit) {
-        await snapshot(page, `stuck-${state}`);
+        if (opts.log) await snapshot(page, `stuck-${state}`);
         throw new ScheduleError(
           state === "password"
             ? "Back on the password page after submitting it once: wrong password or a changed page (see the snapshot text above)"
@@ -255,7 +296,7 @@ export async function login(
         );
       }
 
-      await snapshot(page, `before-${state}`);
+      if (opts.log) await snapshot(page, `before-${state}`);
       const prevUrl = page.url();
 
       switch (state) {
@@ -263,26 +304,29 @@ export async function login(
           await page.waitForLoadState("load").catch(() => {});
           const hidden = page.locator('input[name="instnr"]');
           const before = await hidden.inputValue().catch(() => "?");
-          log(`hidden instnr on page = ${before} (want ${instnr})`);
+          if (opts.log)
+            log(`hidden instnr on page = ${before} (want ${instnr})`);
           if (before !== instnr) {
             // String expression: runs in the browser, so no DOM types are needed here.
             await page.evaluate(
               `(() => { const el = document.querySelector('input[name="instnr"]'); if (el) el.value = ${JSON.stringify(instnr)}; })()`,
             );
-            log(`forced hidden instnr to ${instnr}`);
+            if (opts.log) log(`forced hidden instnr to ${instnr}`);
           }
           await page
             .locator("#huskmig")
             .setChecked(true, { force: true, timeout: 3000 })
-            .catch((e) =>
-              log(`could not set "Remember me": ${e.message.split("\n")[0]}`),
+            .catch((e) => {
+              if (opts.log)
+                log(`could not set "Remember me": ${e.message.split("\n")[0]}`);
+            });
+          if (opts.log)
+            log(
+              `Remember me checked = ${await page
+                .locator("#huskmig")
+                .isChecked()
+                .catch(() => "?")}`,
             );
-          log(
-            `Remember me checked = ${await page
-              .locator("#huskmig")
-              .isChecked()
-              .catch(() => "?")}`,
-          );
           await page.locator("#unilogin").click(); // "Unilogin og Lokalt login"
           break;
         }
@@ -301,21 +345,23 @@ export async function login(
           break;
       }
 
-      log(`ACTION done for ${state}`);
+      if (opts.log) log(`ACTION done for ${state}`);
       await waitForChange(page, context, prevUrl, state);
     }
 
-    await snapshot(page, "timeout");
+    if (opts.log) await snapshot(page, "timeout");
     throw new Error(
       `Timed out after ${OVERALL_TIMEOUT_MS / 1000}s without a utoken cookie`,
     );
   } catch (err) {
-    log(`FAILED ${(err as Error).stack ?? err}`);
-    await snapshot(page, "failure");
-    await logCookies(context, "at failure");
+    if (opts.log) {
+      log(`FAILED ${(err as Error).stack ?? err}`);
+      await snapshot(page, "failure");
+      await logCookies(context, "at failure");
+    }
     throw err;
   } finally {
     await browser.close();
-    log("Browser closed");
+    if (opts.log) log("Browser closed");
   }
 }
