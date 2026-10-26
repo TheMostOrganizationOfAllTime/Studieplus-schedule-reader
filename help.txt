@@ -13,3 +13,4 @@ npm run login                     # Uses the login information in config.json to
 npm run login -- --log            # Shows the log information whilst logging in and saves it to debug/login.log
 npm run login -- --headed         # Shows the browser whilst logging in.
 npm run login -- --slow           # Makes the login process slow down so you have a chance at keeping up.
+npm run login -- --filterRooms    # Finds every valid room in the range defined in config.json.

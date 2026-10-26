@@ -6,10 +6,12 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 
 export async function scanRooms(
   cfg: Config,
-  from: number,
-  to: number,
+  from?: number,
+  to?: number,
   withNames = false,
 ): Promise<void> {
+  from ??= cfg.minRoomId;
+  to ??= cfg.maxRoomId;
   const rooms: number[] = existsSync("validRoomIds.json")
     ? JSON.parse(readFileSync("validRoomIds.json", "utf8"))
     : [];
@@ -75,11 +77,7 @@ export async function compileAllSchedules(
     throw new ScheduleError("weeks must be a positive whole number.");
 
   if (!existsSync("validRoomIds.json"))
-    scanRooms(
-      cfg,
-      scanRange?.from ?? cfg.minRoomId,
-      scanRange?.to ?? cfg.maxRoomId,
-    );
+    await scanRooms(cfg, scanRange?.from, scanRange?.to);
   const ids: number[] = JSON.parse(readFileSync("validRoomIds.json", "utf8"));
 
   const schedules: Record<string, Record<string, Lesson[]>> = {};

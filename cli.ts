@@ -13,7 +13,11 @@ import {
 import { decodeRoom, parseSchedule } from "./decoder.ts";
 import { formatRoom, formatWeek } from "./format.ts";
 import { ScheduleError } from "./types.ts";
-import { compileAllSchedules, getLocallyStoredSchedules } from "./scanner.ts";
+import {
+  compileAllSchedules,
+  getLocallyStoredSchedules,
+  scanRooms,
+} from "./scanner.ts";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
@@ -28,6 +32,7 @@ async function main(): Promise<void> {
       room: { type: "string" },
       fromClasses: { type: "string", multiple: true },
       all: { type: "boolean", default: false },
+      filterRooms: { type: "boolean", default: false },
     },
   });
 
@@ -79,6 +84,10 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
   if (values.all) {
     await compileAllSchedules(cfg, new Date(), 2);
+    return;
+  }
+  if (values.filterRooms) {
+    await scanRooms(cfg);
     return;
   }
   const firstMonday = mondayOf(day);
