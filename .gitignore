@@ -2,6 +2,7 @@ config.json
 raw_*.txt
 node_modules
 roomNames.json
+teachers.json
 validRoomIds.json
 *Schedules.json
 debug

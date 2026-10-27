@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { getRoomWeek, getWeek, loadConfig } from "./api.ts";
+import { getRoomWeek, getTeacherWeek, getWeek, loadConfig } from "./api.ts";
 import {
   addDays,
   dateKey,
@@ -11,12 +11,13 @@ import {
   startOfDayOf,
 } from "./dates.ts";
 import { decodeRoom, parseSchedule } from "./decoder.ts";
-import { formatRoom, formatWeek } from "./format.ts";
+import { formatRoom, formatTeacher, formatWeek } from "./format.ts";
 import { ScheduleError } from "./types.ts";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
   scanRooms,
+  scanTeachers,
 } from "./scanner.ts";
 
 async function main(): Promise<void> {
@@ -30,9 +31,11 @@ async function main(): Promise<void> {
       short: { type: "boolean", default: false },
       file: { type: "string" },
       room: { type: "string" },
-      fromClasses: { type: "string", multiple: true },
+      teacher: { type: "string" },
+      classes: { type: "string", multiple: true },
       all: { type: "boolean", default: false },
       filterRooms: { type: "boolean", default: false },
+      filterTeachers: { type: "boolean", default: false },
     },
   });
 
@@ -41,12 +44,14 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Both argument "file" and argument "fromClasses" defines a source of the data and can therefore not exist simultaneously.
-  if (values.file && values.fromClasses) {
-    console.log(
-      'Cannot have argument "file" and argument "fromClasses" simultaneously',
+  // Both argument "file", argument "room", argument "teacher" and argument "classes" defines a source of the data and can therefore not exist simultaneously.
+  if (
+    [values.file, values.room, values.teacher, values.classes].filter(Boolean)
+      .length > 1
+  ) {
+    throw new ScheduleError(
+      'Cannot have any two of argument "file", "room", "teacher" or "class" simultaneously',
     );
-    return;
   }
 
   // If the file argument is given, use the saved response in the file.
@@ -90,21 +95,32 @@ async function main(): Promise<void> {
     await scanRooms(cfg);
     return;
   }
+  if (values.filterTeachers) {
+    await scanTeachers(cfg);
+    return;
+  }
   const firstMonday = mondayOf(day);
-  if (values.fromClasses) {
+  if (values.classes) {
     if (!existsSync("allSchedules.json"))
       await compileAllSchedules(cfg, new Date(), 2);
     console.log(
-      formatWeek(firstMonday, getLocallyStoredSchedules(values.fromClasses)),
+      formatWeek(firstMonday, getLocallyStoredSchedules(values.classes)),
     );
 
     return;
   }
 
   if (values.room !== undefined && !/^\d+$/.test(values.room)) {
-    throw new ScheduleError(
-      "--room must be the numeric room id from the request payload, e.g. --room 950.",
-    );
+    throw new ScheduleError("--room must be the numeric room id.");
+  }
+  if (values.teacher !== undefined && !/^\d+$/.test(values.teacher)) {
+    const teachers: Record<string, number> = existsSync("teachers.json")
+      ? JSON.parse(readFileSync("teachers.json", "utf8"))
+      : {};
+    if (!teachers[values.teacher])
+      throw new ScheduleError(
+        "--teacher must be the numeric teacher id or valid initials.",
+      );
   }
 
   for (let w = 0; w < weeks; w++) {
@@ -117,6 +133,17 @@ async function main(): Promise<void> {
         values.raw,
       );
       if (w === 0) console.log(formatRoom(room));
+      console.log(formatWeek(monday, days, values.short));
+    } else if (values.teacher !== undefined) {
+      const { days, teacher } = await getTeacherWeek(
+        cfg,
+        /^\d+$/.test(values.teacher)
+          ? Number(values.teacher)
+          : JSON.parse(readFileSync("teachers.json", "utf8"))[values.teacher],
+        monday,
+        values.raw,
+      );
+      if (w === 0) console.log(formatTeacher(teacher));
       console.log(formatWeek(monday, days, values.short));
     } else {
       console.log(

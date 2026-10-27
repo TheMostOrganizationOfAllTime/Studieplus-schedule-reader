@@ -100,6 +100,8 @@ export interface Config {
   // the default range to scan for valid rooms.
   minRoomId: number;
   maxRoomId: number;
+  minTeacherId: number;
+  maxTeacherId: number;
 }
 
 /** An error whose message is meant to be shown to the user as-is. */

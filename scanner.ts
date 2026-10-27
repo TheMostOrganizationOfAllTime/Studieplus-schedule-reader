@@ -1,6 +1,6 @@
 import { Lesson, ScheduleError, type Config, type Day } from "./types.ts";
-import { decodeRoom } from "./decoder.ts";
-import { fetchRoomWeekText, getRoomWeek } from "./api.ts";
+import { decodeRoom, decodeTeacher } from "./decoder.ts";
+import { fetchRoomWeekText, fetchTeacherWeekText, getRoomWeek } from "./api.ts";
 import { addDays, dateKey, mondayOf, parseIsoDate } from "./dates.ts";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 
@@ -64,6 +64,56 @@ export async function scanRooms(
 
   writeFileSync("validRoomIds.json", JSON.stringify(updatedRooms));
   if (withNames) writeFileSync("roomNames.json", JSON.stringify(namedRooms));
+}
+
+export async function scanTeachers(
+  cfg: Config,
+  from?: number,
+  to?: number,
+): Promise<void> {
+  from ??= cfg.minTeacherId;
+  to ??= cfg.maxTeacherId;
+  const teachers: Record<string, number> = existsSync("teachers.json")
+    ? JSON.parse(readFileSync("teachers.json", "utf8"))
+    : {};
+  for (const teacher of Object.keys(teachers)) {
+    if (teachers[teacher] > from || teachers[teacher] < to)
+      delete teachers[teacher];
+  }
+
+  const ids = Array.from(
+    { length: Math.max(0, to - from + 1) },
+    (_, i) => from + i,
+  );
+
+  const initials = new Array<string | undefined>(ids.length);
+  const monday = mondayOf(new Date());
+
+  let nextIndex = 0;
+  async function worker(): Promise<void> {
+    while (true) {
+      const index = nextIndex++;
+
+      if (index >= ids.length) return;
+
+      const id = ids[index];
+      const text = await fetchTeacherWeekText(cfg, id, monday);
+      const teacher = decodeTeacher(text);
+
+      initials[index] = teacher?.initials;
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(20, ids.length) }, () => worker()),
+  );
+
+  for (let i = 0; i < initials.length; i++) {
+    const initial = initials[i];
+    if (initial !== undefined) teachers[initial] = ids[i];
+  }
+
+  writeFileSync("teachers.json", JSON.stringify(teachers));
 }
 
 export async function compileAllSchedules(

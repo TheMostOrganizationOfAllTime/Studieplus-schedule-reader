@@ -1,7 +1,7 @@
 // Turns lessons into text for the terminal.
 
 import { WEEKDAYS, MONTHS, hhmm, isoWeek, pad2 } from "./dates.ts";
-import type { Day, Lesson, Room } from "./types.ts";
+import type { Day, Lesson, Room, Teacher } from "./types.ts";
 
 function clip(text: string, short: boolean): string {
   return short && text.length > 140
@@ -21,6 +21,12 @@ export function formatLesson(l: Lesson): string {
 export function formatRoom(room: Room): string {
   if (!room.name && !room.description) return `Room id ${room.id}`;
   return `Room ${room.name ?? "?"}${room.description ? ` (${room.description})` : ""}, id ${room.id}`;
+}
+
+/** "Lea Hedegaard Arnkjær (lear), id 2941" */
+export function formatTeacher(teacher: Teacher): string {
+  if (!teacher.name && !teacher.initials) return `Teacher id ${teacher.id}`;
+  return `Teacher ${teacher.name ?? "?"}${teacher.initials ? ` (${teacher.initials})` : ""}, id ${teacher.id}`;
 }
 
 export function formatWeek(monday: Date, days: Day[], short = false): string {

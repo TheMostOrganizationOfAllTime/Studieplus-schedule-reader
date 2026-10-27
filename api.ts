@@ -55,6 +55,8 @@ export function loadConfig(): Config {
     strongName: text("strong_name"),
     minRoomId: raw["minRoomId"] as number,
     maxRoomId: raw["maxRoomId"] as number,
+    minTeacherId: raw["minTeacherId"] as number,
+    maxTeacherId: raw["maxTeacherId"] as number,
   };
 }
 
@@ -194,7 +196,7 @@ export async function getTeacherWeek(
   teacherId: number,
   monday: Date,
   saveRaw = false,
-): Promise<Day[]> {
+): Promise<{ days: Day[]; teacher: Teacher }> {
   const text = await fetchTeacherWeekText(cfg, teacherId, monday);
   if (saveRaw)
     writeFileSync(
@@ -202,7 +204,9 @@ export async function getTeacherWeek(
       text,
       "utf-8",
     );
-  return parseSchedule(text, monday);
+  const teacher = decodeTeacher(text);
+  if (teacher === null) throw new ScheduleError("Invalid teacher ID");
+  return { days: parseSchedule(text, monday), teacher };
 }
 
 /** Looks up a teacher by id (one network call). Null if the id is not a teacher. */

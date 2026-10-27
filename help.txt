@@ -5,12 +5,14 @@ npm start -- --from 2026-11-09    # start at the week containing that date
 npm start -- --raw                # also save every raw response to raw_<date>.txt
 npm start -- --short              # cut long notes/homework to 140 characters
 npm start -- --file resp.txt      # decode a saved response (no network)
-npm start -- --room 950           # the schedule of a room instead of your own (id from the request payload)
-npm start -- --fromClasses 24htce # Build schedule based on which classes the studen is a part of. (Multiple allowed)
+npm start -- --room 950           # the schedule of a room instead of your own
+npm start -- --teacher lear       # the schedule of a the teacher with the given initials or id
+npm start -- --class 24htce       # Build schedule based on which classes the student is a part of. (Multiple allowed)
+npm start -- --filterRooms        # Finds every valid room in the range defined in config.json.
+npm start -- --filterTeachers     # Finds every valid room in the range defined in config.json.
 npm start -- --all                # Build all schedules.
 
 npm run login                     # Uses the login information in config.json to aquire the utoken cookie.
 npm run login -- --log            # Shows the log information whilst logging in and saves it to debug/login.log
 npm run login -- --headed         # Shows the browser whilst logging in.
 npm run login -- --slow           # Makes the login process slow down so you have a chance at keeping up.
-npm run login -- --filterRooms    # Finds every valid room in the range defined in config.json.
