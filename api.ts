@@ -3,10 +3,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { addDays, dateKey } from "./dates.ts";
-import { decodeRoom, parseSchedule } from "./decoder.ts";
+import { addDays, dateKey, mondayOf, startOfDayOf } from "./dates.ts";
+import { decodeRoom, decodeTeacher, parseSchedule } from "./decoder.ts";
 import {
   ScheduleError,
+  Teacher,
   type Config,
   type Day,
   type RoomWeek,
@@ -23,6 +24,8 @@ const LIST_TYPE =
 const STRING_TYPE = "java.lang.String/2004016611";
 /** The only ListeType value seen so far: it means "schedule of a room". */
 const LIST_TYPE_ROOM = 0;
+const LIST_TYPE_DEFAULT = 0;
+const TEACHER_FLAG = 0;
 
 /** Reads config.json (next to this file). */
 export function loadConfig(): Config {
@@ -158,4 +161,55 @@ export async function getRoomWeek(
     description: null,
   };
   return { room, days: parseSchedule(text, monday) };
+}
+
+/** Body for hentMedaSkemaData(ListeType, String teacherId, UDate from, UDate to, int): a teacher's schedule. */
+export function buildTeacherBody(
+  cfg: Config,
+  teacherId: number,
+  from: Date,
+  to: Date,
+): string {
+  const strongName = cfg.strongName || DEFAULT_STRONG_NAME;
+  return (
+    `7|0|10|${BASE}|${strongName}|${SERVICE}|hentMedaSkemaData|${LIST_TYPE}|${STRING_TYPE}|${UDATE_TYPE}|I|${teacherId}|UDate:|` +
+    `1|2|3|4|5|5|6|7|7|8|5|${LIST_TYPE_DEFAULT}|9|${udate(7, 10, from)}${udate(7, 10, to)}${TEACHER_FLAG}|`
+  );
+}
+
+export function fetchTeacherWeekText(
+  cfg: Config,
+  teacherId: number,
+  monday: Date,
+): Promise<string> {
+  return post(
+    cfg,
+    buildTeacherBody(cfg, teacherId, monday, addDays(monday, 6)),
+  );
+}
+
+/** One week of a teacher's schedule. Always 7 days (Mon..Sun). */
+export async function getTeacherWeek(
+  cfg: Config,
+  teacherId: number,
+  monday: Date,
+  saveRaw = false,
+): Promise<Day[]> {
+  const text = await fetchTeacherWeekText(cfg, teacherId, monday);
+  if (saveRaw)
+    writeFileSync(
+      join(HERE, `raw_teacher${teacherId}_${dateKey(monday)}.txt`),
+      text,
+      "utf-8",
+    );
+  return parseSchedule(text, monday);
+}
+
+/** Looks up a teacher by id (one network call). Null if the id is not a teacher. */
+export async function getTeacher(
+  cfg: Config,
+  teacherId: number,
+  monday: Date = mondayOf(startOfDayOf(new Date())),
+): Promise<Teacher | null> {
+  return decodeTeacher(await fetchTeacherWeekText(cfg, teacherId, monday));
 }

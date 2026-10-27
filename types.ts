@@ -76,6 +76,19 @@ export interface RoomWeek {
   days: Day[];
 }
 
+/** A teacher (called "medarbejder"). */
+export class Teacher {
+  readonly id: number;
+  readonly initials: string;
+  readonly name: string;
+
+  constructor(id: number, initials: string, name: string) {
+    this.id = id;
+    this.initials = initials;
+    this.name = name;
+  }
+}
+
 /** Settings read from config.json. */
 export interface Config {
   instnr: string;

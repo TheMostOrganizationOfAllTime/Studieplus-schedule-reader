@@ -6,7 +6,13 @@
 // Everything in a lesson below is described in "file order" (the writer's order is the reverse).
 
 import { addDays, dateKey } from "./dates.ts";
-import { Lesson, ScheduleError, type Day, type Room } from "./types.ts";
+import {
+  Lesson,
+  ScheduleError,
+  Teacher,
+  type Day,
+  type Room,
+} from "./types.ts";
 
 /** Booking-type lessons carry two strings: a TYPE (Elevmøde, Eksamen, Forberedelse...) and a TITLE
  *  (a free text, or the subject for exams). For these types the TITLE is shown as the subject and the
@@ -365,4 +371,21 @@ export function parseSchedule(text: string, monday?: Date): Day[] {
       lessons,
     };
   });
+}
+
+/** Reads the teacher info from a teacher schedule response (hentMedaSkemaData). Null if there is none. */
+export function decodeTeacher(text: string): Teacher | null {
+  if (!text.startsWith("//OK")) return null;
+  const table = readStringTable(text);
+  const med = indexOfClass(table, "dk.uddata.model.bruger.Medarbejder/");
+  const int = indexOfClass(table, "java.lang.Integer");
+  if (med === null || int === null) return null;
+  const re = new RegExp(
+    String.raw`(?<![\d-])\d+,(\d+),\d+,${int},0,(\d+),0,0,(\d+),0,(?:-?\d+,){0,20}?${med},(\d+),${int}(?!\d)`,
+  );
+  const m = re.exec(text);
+  if (!m) return null;
+  const str = (ref: string) => table[Number(ref) - 1]?.trim() ?? "";
+  const name = [str(m[2]), str(m[3])].filter(Boolean).join(" ");
+  return new Teacher(Number(m[4]), str(m[1]), name);
 }
