@@ -22,7 +22,7 @@ app.get("/api", async (req, res) => res.status(200).send("Succes"));
 // /api/teacher/initials?weeks=1&from=2026-10-28
 app.get("/api/teacher/:input", async (req, res) => {
   const input = isTeacher(req.params.input);
-  if (input === null) res.status(404).send("Teacher not found");
+  if (input === null) return res.status(404).send("Teacher not found");
   let params = req.query as {
     weeks: string | undefined;
     from: string | undefined;
@@ -31,7 +31,8 @@ app.get("/api/teacher/:input", async (req, res) => {
   const from = mondayOf(
     params.from ? (parseIsoDate(params.from) ?? new Date()) : new Date(),
   );
-  if (weeks == 1) res.status(200).json(await getTeacherWeek(cfg, input!, from));
+  if (weeks == 1)
+    return res.status(200).json(await getTeacherWeek(cfg, input!, from));
 
   const result: { days: Day[]; teacher: Teacher } = await getTeacherWeek(
     cfg,
@@ -43,7 +44,7 @@ app.get("/api/teacher/:input", async (req, res) => {
       (await getTeacherWeek(cfg, input!, addDays(from, 7 * i))).days,
     );
   }
-  res.status(200).json(result);
+  return res.status(200).json(result);
 });
 
 // /api/student?weeks=1&from=2026-10-28
@@ -61,21 +62,21 @@ app.get("/api/student", async (req, res) => {
         ? params.class
         : [params.class];
   if (classes.length > 0)
-    res.status(200).json(getLocallyStoredSchedules(classes));
+    return res.status(200).json(getLocallyStoredSchedules(classes));
 
   if (ALLOWSHOWINGPERSONALSCHEDULE) {
     const weeks = Number(params.weeks) || 1;
     const from = mondayOf(
       params.from ? (parseIsoDate(params.from) ?? new Date()) : new Date(),
     );
-    if (weeks === 1) res.status(200).json(await getWeek(cfg, from));
+    if (weeks === 1) return res.status(200).json(await getWeek(cfg, from));
 
     let result = await getWeek(cfg, from);
     for (let i = 1; i < weeks; i++)
       result = result.concat(await getWeek(cfg, addDays(from, 7 * i)));
-    res.status(200).json(result);
+    return res.status(200).json(result);
   }
-  res.status(401).send("Unauthorized");
+  return res.status(401).send("Unauthorized");
 });
 
 // Checks if the input is a valid teacher.
