@@ -116,7 +116,9 @@ async function post(
   if (!response.ok) {
     if (!depth || depth < 5) {
       await login();
-      return await post(loadConfig(), body, (depth ?? 0) + 1);
+      // cfg is a pointer so by updating the utoken here it will trickle upwards.
+      cfg.utoken = loadConfig().utoken;
+      return await post(cfg, body, (depth ?? 0) + 1);
     }
 
     throw new ScheduleError(

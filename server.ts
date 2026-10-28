@@ -1,15 +1,58 @@
 import express from "express";
 import { addDays, mondayOf, parseIsoDate } from "./dates.ts";
 import { getTeacherWeek, getWeek, loadConfig } from "./api.ts";
-import type { Day, Teacher } from "./types.ts";
+import { ScheduleError, type Day, type Teacher } from "./types.ts";
 import { readFileSync } from "fs";
-import { getLocallyStoredSchedules } from "./scanner.ts";
+import { compileAllSchedules, getLocallyStoredSchedules } from "./scanner.ts";
 
 const app = express();
 const PORT = 3000;
-const ALLOWSHOWINGPERSONALSCHEDULE = false;
+const ALLOWSHOWINGPERSONALSCHEDULE = true;
+const RECHECKTIMES = ["16:00"]; // Must be "HH:mm"
 
 const cfg = loadConfig();
+
+// Scheduler
+function getNextRun(): Date {
+  const now = new Date();
+  const candidates: Date[] = [];
+
+  for (const time of RECHECKTIMES) {
+    const [hours, minutes] = time.split(":").map(Number);
+
+    const candidate = new Date(now);
+    candidate.setHours(hours, minutes, 0, 0);
+
+    // If today's time has passed, schedule for tomorrow.
+    if (candidate.getTime() <= now.getTime())
+      candidate.setDate(candidate.getDate() + 1);
+
+    candidates.push(candidate);
+  }
+
+  return candidates.reduce((earliest, current) =>
+    current.getTime() < earliest.getTime() ? current : earliest,
+  );
+}
+
+async function startScheduler(): Promise<void> {
+  if (!RECHECKTIMES || RECHECKTIMES.length === 0)
+    throw new ScheduleError("No scheduled times configured.");
+
+  function scheduleNext(): void {
+    const delay = getNextRun().getTime() - Date.now();
+
+    setTimeout(async () => {
+      // Schedule the next run independently of the current task.
+      scheduleNext();
+      compileAllSchedules(cfg, new Date(), 2);
+    }, delay);
+  }
+
+  scheduleNext();
+}
+
+startScheduler();
 
 // app.use(cookieParser())
 app.use(express.json());

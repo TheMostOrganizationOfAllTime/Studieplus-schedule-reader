@@ -12,7 +12,7 @@ import {
 } from "./dates.ts";
 import { decodeRoom, parseSchedule } from "./decoder.ts";
 import { formatRoom, formatTeacher, formatWeek } from "./format.ts";
-import { ScheduleError, Teacher } from "./types.ts";
+import { ScheduleError } from "./types.ts";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
