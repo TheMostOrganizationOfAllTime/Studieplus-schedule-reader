@@ -12,6 +12,7 @@ import {
   type Day,
   type RoomWeek,
 } from "./types.ts";
+import { login } from "./login.ts";
 
 export const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = "https://all.uddataplus.dk/skema/skema/";
@@ -89,7 +90,11 @@ export function buildRoomBody(
 }
 
 /** Sends a request body to Studie+ and returns the raw response text. */
-async function post(cfg: Config, body: string): Promise<string> {
+async function post(
+  cfg: Config,
+  body: string,
+  depth?: number,
+): Promise<string> {
   const headers: Record<string, string> = {
     "Content-Type": "text/x-gwt-rpc; charset=UTF-8",
     "X-GWT-Module-Base": BASE,
@@ -109,6 +114,11 @@ async function post(cfg: Config, body: string): Promise<string> {
     throw new ScheduleError(`Could not reach Studie+: ${(e as Error).message}`);
   }
   if (!response.ok) {
+    if (!depth || depth < 5) {
+      await login();
+      return await post(loadConfig(), body, (depth ?? 0) + 1);
+    }
+
     throw new ScheduleError(
       `HTTP ${response.status} from server. 401/403 = cookies expired or wrong; ` +
         `500 = strong name changed (see README_SETUP.md).`,
