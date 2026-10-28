@@ -12,13 +12,14 @@ import {
 } from "./dates.ts";
 import { decodeRoom, parseSchedule } from "./decoder.ts";
 import { formatRoom, formatTeacher, formatWeek } from "./format.ts";
-import { ScheduleError } from "./types.ts";
+import { ScheduleError, Teacher } from "./types.ts";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
   scanRooms,
   scanTeachers,
 } from "./scanner.ts";
+import { isTeacher } from "./server.ts";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
@@ -110,18 +111,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (values.room !== undefined && !/^\d+$/.test(values.room)) {
+  if (values.room !== undefined && !/^\d+$/.test(values.room))
     throw new ScheduleError("--room must be the numeric room id.");
-  }
-  if (values.teacher !== undefined && !/^\d+$/.test(values.teacher)) {
-    const teachers: Record<string, number> = existsSync("teachers.json")
-      ? JSON.parse(readFileSync("teachers.json", "utf8"))
-      : {};
-    if (!teachers[values.teacher])
-      throw new ScheduleError(
-        "--teacher must be the numeric teacher id or valid initials.",
-      );
-  }
+  if (values.teacher !== undefined && !isTeacher(values.teacher))
+    throw new ScheduleError(
+      "--teacher must be the numeric teacher id or valid initials.",
+    );
 
   for (let w = 0; w < weeks; w++) {
     const monday = addDays(firstMonday, 7 * w);
@@ -137,9 +132,7 @@ async function main(): Promise<void> {
     } else if (values.teacher !== undefined) {
       const { days, teacher } = await getTeacherWeek(
         cfg,
-        /^\d+$/.test(values.teacher)
-          ? Number(values.teacher)
-          : JSON.parse(readFileSync("teachers.json", "utf8"))[values.teacher],
+        isTeacher(values.teacher)!,
         monday,
         values.raw,
       );
