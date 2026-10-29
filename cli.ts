@@ -16,11 +16,10 @@ import { ScheduleError } from "./types.ts";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
+  isTeacher,
   scanRooms,
   scanTeachers,
-  updateSchedule,
 } from "./scanner.ts";
-import { isTeacher } from "./server.ts";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.

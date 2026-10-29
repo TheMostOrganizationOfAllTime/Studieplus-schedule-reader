@@ -2,10 +2,10 @@ import express from "express";
 import { addDays, mondayOf, parseIsoDate } from "./dates.ts";
 import { getTeacherWeek, getWeek, loadConfig } from "./api.ts";
 import { ScheduleError, type Day, type Teacher } from "./types.ts";
-import { readFileSync } from "fs";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
+  isTeacher,
   updateSchedule,
 } from "./scanner.ts";
 
@@ -149,21 +149,3 @@ app.get("/api/newestSchedule", async (req, res) => {
         : schedule,
     );
 });
-
-// Checks if the input is a valid teacher.
-export function isTeacher(
-  input: string | number,
-  valid?: Record<string, number>,
-): number | null {
-  valid ??= JSON.parse(readFileSync("teachers.json", "utf8")) as Record<
-    string,
-    number
-  >;
-  if (typeof input === "string") {
-    if (valid[input] !== undefined) return valid[input];
-    if (!/^\d+$/.test(input)) return null;
-    input = Number(input);
-  }
-  for (const id of Object.values(valid)) if (id === input) return id;
-  return null;
-}
