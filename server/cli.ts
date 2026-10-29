@@ -20,6 +20,10 @@ import {
   scanRooms,
   scanTeachers,
 } from "./scanner.ts";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const HERE = dirname(fileURLToPath(import.meta.url)) + "/";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
@@ -33,7 +37,7 @@ async function main(): Promise<void> {
       file: { type: "string" },
       room: { type: "string" },
       teacher: { type: "string" },
-      classes: { type: "string", multiple: true },
+      class: { type: "string", multiple: true },
       all: { type: "boolean", default: false },
       filterRooms: { type: "boolean", default: false },
       filterTeachers: { type: "boolean", default: false },
@@ -41,13 +45,13 @@ async function main(): Promise<void> {
   });
 
   if (values.help) {
-    console.log(readFileSync("help.txt"));
+    console.log(readFileSync(HERE + "help.txt", "utf-8"));
     return;
   }
 
   // Both argument "file", argument "room", argument "teacher" and argument "classes" defines a source of the data and can therefore not exist simultaneously.
   if (
-    [values.file, values.room, values.teacher, values.classes].filter(Boolean)
+    [values.file, values.room, values.teacher, values.class].filter(Boolean)
       .length > 1
   ) {
     throw new ScheduleError(
@@ -88,24 +92,16 @@ async function main(): Promise<void> {
   }
 
   const cfg = loadConfig();
-  if (values.all) {
-    await compileAllSchedules(cfg, new Date(), 2);
-    return;
-  }
-  if (values.filterRooms) {
-    await scanRooms(cfg);
-    return;
-  }
-  if (values.filterTeachers) {
-    await scanTeachers(cfg);
-    return;
-  }
+  if (values.filterRooms) await scanRooms(cfg);
+  if (values.filterTeachers) await scanTeachers(cfg);
+  if (values.all) await compileAllSchedules(cfg, new Date(), 2);
+
   const firstMonday = mondayOf(day);
-  if (values.classes) {
-    if (!existsSync("allSchedules.json"))
+  if (values.class) {
+    if (!existsSync(HERE + "allSchedules.json"))
       await compileAllSchedules(cfg, new Date(), 2);
     console.log(
-      formatWeek(firstMonday, getLocallyStoredSchedules(values.classes)),
+      formatWeek(firstMonday, getLocallyStoredSchedules(values.class)),
     );
 
     return;

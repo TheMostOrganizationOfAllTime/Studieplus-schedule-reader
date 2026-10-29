@@ -5,10 +5,8 @@
   "type": "module",
   "description": "Reads your Studie+ schedule",
   "scripts": {
-    "start": "tsx cli.ts",
-    "check": "tsc --noEmit",
-    "login": "tsx run-login.ts",
-    "login:headed": "tsx run-login.ts --headed --slow"
+    "start": "tsx server/cli.ts",
+    "login": "tsx server/run-login.ts"
   },
   "dependencies": {
     "express": "^5.3.0",

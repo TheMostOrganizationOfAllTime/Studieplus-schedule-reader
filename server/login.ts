@@ -5,13 +5,15 @@ import {
   type Page,
 } from "playwright";
 import fs from "node:fs";
-import path from "node:path";
+import path, { dirname } from "node:path";
 import { ScheduleError } from "./types.ts";
+import { fileURLToPath } from "node:url";
 
 // ───────────────────────── paths & constants ─────────────────────────
-const CONFIG_PATH = path.resolve("config.json");
-const DEBUG_DIR = path.resolve("debug");
-const LOG_FILE = path.join(DEBUG_DIR, "login.log");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const CONFIG_PATH = HERE + "/config.json";
+const DEBUG_DIR = HERE + "/debug";
+const LOG_FILE = DEBUG_DIR + "/login.log";
 
 const START_URL = "https://all.uddataplus.dk/";
 const OVERALL_TIMEOUT_MS = 90_000;
@@ -29,6 +31,7 @@ type Config = {
 };
 
 function readConfig(): Config {
+  console.log(CONFIG_PATH);
   if (!fs.existsSync(CONFIG_PATH))
     throw new ScheduleError(`Missing config file on ${CONFIG_PATH}`);
   const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")) as Config;

@@ -14,7 +14,10 @@ import {
   startOfDayOf,
 } from "./dates.ts";
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import { formatWeek } from "./format.ts";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const HERE = dirname(fileURLToPath(import.meta.url)) + "/";
 
 export async function scanRooms(
   cfg: Config,
@@ -24,13 +27,13 @@ export async function scanRooms(
 ): Promise<void> {
   from ??= cfg.minRoomId;
   to ??= cfg.maxRoomId;
-  const rooms: number[] = existsSync("validRoomIds.json")
-    ? JSON.parse(readFileSync("validRoomIds.json", "utf8"))
+  const rooms: number[] = existsSync(HERE + "validRoomIds.json")
+    ? JSON.parse(readFileSync(HERE + "validRoomIds.json", "utf8"))
     : [];
 
   const namedRooms: Record<number, string> =
-    withNames && existsSync("roomNames.json")
-      ? JSON.parse(readFileSync("roomNames.json", "utf8"))
+    withNames && existsSync(HERE + "roomNames.json")
+      ? JSON.parse(readFileSync(HERE + "roomNames.json", "utf8"))
       : {};
 
   const ids = Array.from(
@@ -74,8 +77,9 @@ export async function scanRooms(
     ...ids.filter((_, index) => valid[index]),
   ].sort((a, b) => a - b);
 
-  writeFileSync("validRoomIds.json", JSON.stringify(updatedRooms));
-  if (withNames) writeFileSync("roomNames.json", JSON.stringify(namedRooms));
+  writeFileSync(HERE + "validRoomIds.json", JSON.stringify(updatedRooms));
+  if (withNames)
+    writeFileSync(HERE + "roomNames.json", JSON.stringify(namedRooms));
 }
 
 export async function scanTeachers(
@@ -85,8 +89,8 @@ export async function scanTeachers(
 ): Promise<void> {
   from ??= cfg.minTeacherId;
   to ??= cfg.maxTeacherId;
-  const teachers: Record<string, number> = existsSync("teachers.json")
-    ? JSON.parse(readFileSync("teachers.json", "utf8"))
+  const teachers: Record<string, number> = existsSync(HERE + "teachers.json")
+    ? JSON.parse(readFileSync(HERE + "teachers.json", "utf8"))
     : {};
   for (const teacher of Object.keys(teachers)) {
     if (teachers[teacher] > from || teachers[teacher] < to)
@@ -125,7 +129,7 @@ export async function scanTeachers(
     if (initial !== undefined) teachers[initial] = ids[i];
   }
 
-  writeFileSync("teachers.json", JSON.stringify(teachers));
+  writeFileSync(HERE + "teachers.json", JSON.stringify(teachers));
 }
 
 export async function compileAllSchedules(
@@ -138,9 +142,11 @@ export async function compileAllSchedules(
   if (weeks <= 0)
     throw new ScheduleError("weeks must be a positive whole number.");
 
-  if (!existsSync("validRoomIds.json"))
+  if (!existsSync(HERE + "validRoomIds.json"))
     await scanRooms(cfg, scanRange?.from, scanRange?.to);
-  const ids: number[] = JSON.parse(readFileSync("validRoomIds.json", "utf8"));
+  const ids: number[] = JSON.parse(
+    readFileSync(HERE + "validRoomIds.json", "utf8"),
+  );
 
   const schedules: Record<string, Record<string, Lesson[]>> = {};
   const firstMonday = mondayOf(date);
@@ -213,14 +219,14 @@ export async function compileAllSchedules(
     }
   }
 
-  writeFileSync("allSchedules.json", JSON.stringify(schedules));
+  writeFileSync(HERE + "allSchedules.json", JSON.stringify(schedules));
 }
 
 export function getLocallyStoredSchedules(classes: string[]): Day[] {
-  if (!existsSync("allSchedules.json"))
+  if (!existsSync(HERE + "allSchedules.json"))
     throw new ScheduleError("allSchedules.json has not been generated");
   const allSchedules: Record<string, Record<string, Lesson[]>> = JSON.parse(
-    readFileSync("allSchedules.json", "utf8"),
+    readFileSync(HERE + "allSchedules.json", "utf8"),
   );
 
   const week: Day[] = [];
@@ -267,8 +273,8 @@ export async function updateSchedule(cfg: Config, classes: string[]) {
   const mondays = [
     ...new Set(current.map((day) => dateKey(mondayOf(day.date)))),
   ].map((date) => parseIsoDate(date)!);
-  const teacherMap: Record<string, number> = existsSync("teachers.json")
-    ? JSON.parse(readFileSync("teachers.json", "utf8"))
+  const teacherMap: Record<string, number> = existsSync("HERE + teachers.json")
+    ? JSON.parse(readFileSync(HERE + "teachers.json", "utf8"))
     : {};
   const teachers = new Set(
     current.flatMap((day) =>
@@ -350,7 +356,7 @@ export function isTeacher(
   input: string | number,
   valid?: Record<string, number>,
 ): number | null {
-  valid ??= JSON.parse(readFileSync("teachers.json", "utf8")) as Record<
+  valid ??= JSON.parse(readFileSync(HERE + "teachers.json", "utf8")) as Record<
     string,
     number
   >;
