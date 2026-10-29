@@ -1,8 +1,20 @@
 import { Lesson, ScheduleError, type Config, type Day } from "./types.ts";
 import { decodeRoom, decodeTeacher } from "./decoder.ts";
-import { fetchRoomWeekText, fetchTeacherWeekText, getRoomWeek } from "./api.ts";
-import { addDays, dateKey, mondayOf, parseIsoDate } from "./dates.ts";
+import {
+  fetchRoomWeekText,
+  fetchTeacherWeekText,
+  getRoomWeek,
+  getTeacherWeek,
+} from "./api.ts";
+import {
+  addDays,
+  dateKey,
+  mondayOf,
+  parseIsoDate,
+  startOfDayOf,
+} from "./dates.ts";
 import { existsSync, readFileSync, writeFileSync } from "fs";
+import { formatWeek } from "./format.ts";
 
 export async function scanRooms(
   cfg: Config,
@@ -248,4 +260,87 @@ export function getLocallyStoredSchedules(classes: string[]): Day[] {
   for (const day of week)
     day.lessons.sort((a, b) => (a.start >= b.start ? 1 : -1));
   return week;
+}
+
+export async function updateSchedule(cfg: Config, classes: string[]) {
+  const current = getLocallyStoredSchedules(classes);
+  const mondays = [
+    ...new Set(current.map((day) => dateKey(mondayOf(day.date)))),
+  ].map((date) => parseIsoDate(date)!);
+  const teacherMap: Record<string, number> = existsSync("teachers.json")
+    ? JSON.parse(readFileSync("teachers.json", "utf8"))
+    : {};
+  const teachers = new Set(
+    current.flatMap((day) =>
+      day.lessons.flatMap((lesson) =>
+        lesson.teachers.map((teacher) => teacherMap[teacher]),
+      ),
+    ),
+  );
+  const updated = Object.values(
+    (
+      await Promise.all(
+        mondays.map(async (monday) =>
+          (
+            await Promise.all(
+              [...teachers].map(async (teacher) =>
+                (await getTeacherWeek(cfg, teacher, monday)).days.map(
+                  (day) => ({
+                    ...day,
+                    lessons: day.lessons.filter((lesson) =>
+                      lesson.classes.some((cl) => classes.includes(cl)),
+                    ),
+                  }),
+                ),
+              ),
+            )
+          ).flat(),
+        ),
+      )
+    )
+      .flat()
+      .filter((day) => day.lessons.length > 0)
+      .reduce<Record<string, Day>>((acc, day) => {
+        const key = dateKey(day.date);
+        if (acc[key]) {
+          acc[key].lessons.push(...day.lessons);
+        } else {
+          acc[key] = { ...day, lessons: [...day.lessons] };
+        }
+        return acc;
+      }, {}),
+  )
+    .map((day) => ({
+      ...day,
+      lessons: day.lessons.sort(
+        (a, b) => a.start.getTime() - b.start.getTime(),
+      ),
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime()) as Day[];
+
+  const today = startOfDayOf(new Date());
+
+  if (
+    compareSchedules(
+      current.filter((day) => today <= day.date),
+      updated.filter((day) => today <= day.date),
+    )
+  )
+    return current;
+  await compileAllSchedules(cfg, new Date(), 2);
+  return getLocallyStoredSchedules(classes);
+}
+
+function compareSchedules(a: Day[], b: Day[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (day, di) =>
+        dateKey(day.date) === dateKey(b[di].date) &&
+        day.lessons.length === b[di].lessons.length &&
+        day.lessons.every(
+          (lesson, li) => lesson.eventId === b[di].lessons[li].eventId,
+        ),
+    )
+  );
 }

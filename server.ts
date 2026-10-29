@@ -3,7 +3,11 @@ import { addDays, mondayOf, parseIsoDate } from "./dates.ts";
 import { getTeacherWeek, getWeek, loadConfig } from "./api.ts";
 import { ScheduleError, type Day, type Teacher } from "./types.ts";
 import { readFileSync } from "fs";
-import { compileAllSchedules, getLocallyStoredSchedules } from "./scanner.ts";
+import {
+  compileAllSchedules,
+  getLocallyStoredSchedules,
+  updateSchedule,
+} from "./scanner.ts";
 
 const app = express();
 const PORT = 3000;
@@ -120,6 +124,30 @@ app.get("/api/student", async (req, res) => {
     return res.status(200).json(result);
   }
   return res.status(401).send("Unauthorized");
+});
+
+// /api/newestSchedule?day=2026-10-30&class=24htce&class=24htceinB
+app.get("/api/newestSchedule", async (req, res) => {
+  let params = req.query as {
+    day: string | undefined;
+    class: string | string[] | undefined;
+  };
+  const classes: string[] =
+    params.class === undefined
+      ? []
+      : Array.isArray(params.class)
+        ? params.class
+        : [params.class];
+  const day = params.day ? parseIsoDate(params.day) : null;
+  const schedule = await updateSchedule(cfg, classes);
+
+  return res
+    .status(200)
+    .json(
+      day
+        ? schedule.find((schDay) => schDay.date.getTime() == day.getTime())
+        : schedule,
+    );
 });
 
 // Checks if the input is a valid teacher.

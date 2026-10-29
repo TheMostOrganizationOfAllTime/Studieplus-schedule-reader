@@ -18,6 +18,7 @@ import {
   getLocallyStoredSchedules,
   scanRooms,
   scanTeachers,
+  updateSchedule,
 } from "./scanner.ts";
 import { isTeacher } from "./server.ts";
 
