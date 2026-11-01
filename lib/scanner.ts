@@ -20,32 +20,22 @@ export async function scanRooms(
   cfg: Config,
   from?: number,
   to?: number,
-  withNames = false,
 ): Promise<void> {
   from ??= cfg.minRoomId;
   to ??= cfg.maxRoomId;
-  const rooms: number[] = existsSync(dataPath("validRoomIds.json"))
-    ? JSON.parse(readFileSync(dataPath("validRoomIds.json"), "utf8"))
+  const rooms: { name: string; id: number }[] = existsSync(
+    dataPath("validRooms.json"),
+  )
+    ? JSON.parse(readFileSync(dataPath("validRooms.json"), "utf8"))
     : [];
-
-  const namedRooms: Record<number, string> =
-    withNames && existsSync(dataPath("roomNames.json"))
-      ? JSON.parse(readFileSync(dataPath("roomNames.json"), "utf8"))
-      : {};
 
   const ids = Array.from(
     { length: Math.max(0, to - from + 1) },
     (_, i) => from + i,
   );
 
-  const valid = new Array<boolean>(ids.length).fill(false);
+  const valid = new Array<string | null>(ids.length).fill(null);
   const monday = mondayOf(new Date());
-
-  if (withNames) {
-    for (const id of ids) {
-      delete namedRooms[id];
-    }
-  }
 
   let nextIndex = 0;
   async function worker(): Promise<void> {
@@ -58,10 +48,7 @@ export async function scanRooms(
       const text = await fetchRoomWeekText(cfg, id, monday);
       const room = decodeRoom(text);
 
-      if (room) {
-        valid[index] = true;
-        if (withNames) namedRooms[id] = room.name ?? `NoName${id}`;
-      }
+      if (room) valid[index] = room.name;
     }
   }
 
@@ -70,13 +57,13 @@ export async function scanRooms(
   );
 
   const updatedRooms = [
-    ...rooms.filter((id) => id < from || id > to),
-    ...ids.filter((_, index) => valid[index]),
-  ].sort((a, b) => a - b);
+    ...rooms.filter((room) => room.id < from || room.id > to),
+    ...ids
+      .filter((_, index) => valid[index] !== null)
+      .map((id, index) => ({ id, name: valid[index]! })),
+  ].sort((a, b) => a.id - b.id);
 
-  writeFileSync(dataPath("validRoomIds.json"), JSON.stringify(updatedRooms));
-  if (withNames)
-    writeFileSync(dataPath("roomNames.json"), JSON.stringify(namedRooms));
+  writeFileSync(dataPath("validRooms.json"), JSON.stringify(updatedRooms));
 }
 
 export async function scanTeachers(
@@ -139,11 +126,14 @@ export async function compileAllSchedules(
   if (weeks <= 0)
     throw new ScheduleError("weeks must be a positive whole number.");
 
-  if (!existsSync(dataPath("validRoomIds.json")))
+  if (!existsSync(dataPath("validRooms.json")))
     await scanRooms(cfg, scanRange?.from, scanRange?.to);
-  const ids: number[] = JSON.parse(
-    readFileSync(dataPath("validRoomIds.json"), "utf8"),
-  );
+  const ids: number[] = (
+    JSON.parse(readFileSync(dataPath("validRooms.json"), "utf8")) as {
+      id: number;
+      name: string;
+    }[]
+  ).map((room) => room.id);
 
   const schedules: Record<string, Record<string, Lesson[]>> = {};
   const firstMonday = mondayOf(date);
@@ -350,12 +340,12 @@ function compareSchedules(a: Day[], b: Day[]): boolean {
   );
 }
 
-// Checks if the input is a valid teacher.
+/** Checks if the input is a valid teacher. */
 export function isTeacher(
   input: string | number,
   valid?: Record<string, number>,
 ): number | null {
-  if (!existsSync(dataPath("teachers.json")))
+  if (!valid && !existsSync(dataPath("teachers.json")))
     throw new ScheduleError("No valid teachers where provided");
 
   valid ??= JSON.parse(
@@ -368,4 +358,27 @@ export function isTeacher(
   }
   for (const id of Object.values(valid)) if (id === input) return id;
   return null;
+}
+
+/** Checks if the input is a valid room. */
+export function isRoom(
+  input: string | number,
+  valid?: { name: string; id: number }[],
+): number | null {
+  if (!valid && !existsSync(dataPath("validRooms.json")))
+    throw new ScheduleError("No valid rooms where provided");
+
+  valid ??= JSON.parse(readFileSync(dataPath("validRooms.json"), "utf8")) as {
+    name: string;
+    id: number;
+  }[];
+  console.log(valid);
+  if (typeof input === "string") {
+    const inputNumber = Number(input);
+    return (
+      valid.find((room) => room.name === input || room.id === inputNumber)
+        ?.id || null
+    );
+  }
+  return valid.find((room) => room.id === input)?.id || null;
 }

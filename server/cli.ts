@@ -22,6 +22,7 @@ import { ScheduleError } from "../lib/types.ts";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
+  isRoom,
   isTeacher,
   scanRooms,
   scanTeachers,
@@ -116,9 +117,14 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (values.room !== undefined && !/^\d+$/.test(values.room))
-    throw new ScheduleError("--room must be the numeric room id.");
-  if (values.teacher !== undefined && !isTeacher(values.teacher))
+  const roomId = values.room !== undefined ? isRoom(values.room) : null;
+  if (values.room !== undefined && !roomId)
+    throw new ScheduleError(
+      "--room must be the numeric room id or a valid room name.",
+    );
+  const teacherId =
+    values.teacher !== undefined ? isTeacher(values.teacher) : null;
+  if (values.teacher !== undefined && !teacherId)
     throw new ScheduleError(
       "--teacher must be the numeric teacher id or valid initials.",
     );
@@ -128,7 +134,7 @@ async function main(): Promise<void> {
     if (values.room !== undefined) {
       const { room, days } = await getRoomWeek(
         cfg,
-        Number(values.room),
+        roomId!,
         monday,
         values.raw,
       );
@@ -137,7 +143,7 @@ async function main(): Promise<void> {
     } else if (values.teacher !== undefined) {
       const { days, teacher } = await getTeacherWeek(
         cfg,
-        isTeacher(values.teacher)!,
+        teacherId!,
         monday,
         values.raw,
       );
