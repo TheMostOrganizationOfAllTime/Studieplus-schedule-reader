@@ -381,7 +381,7 @@ export function decodeTeacher(text: string): Teacher | null {
   const int = indexOfClass(table, "java.lang.Integer");
   if (med === null || int === null) return null;
   const re = new RegExp(
-    String.raw`(?<![\d-])\d+,(\d+),\d+,${int},0,(\d+),0,0,(\d+),0,(?:-?\d+,){0,20}?${med},(\d+),${int}(?!\d)`,
+    String.raw`(?<![\d-])\d+,(\d+),(?:-?\d+,){1,2}?${int},0,(\d+),0,0,(\d+),0,(?:-?\d+,){0,20}?${med},(\d+),${int}(?!\d)`,
   );
   const m = re.exec(text);
   if (!m) return null;

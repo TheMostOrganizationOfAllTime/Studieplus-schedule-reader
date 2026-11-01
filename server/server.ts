@@ -1,13 +1,13 @@
 import express from "express";
-import { addDays, mondayOf, parseIsoDate } from "./dates.ts";
-import { getTeacherWeek, getWeek, loadConfig } from "./api.ts";
-import { ScheduleError, type Day, type Teacher } from "./types.ts";
+import { addDays, mondayOf, parseIsoDate } from "../lib/dates.ts";
+import { getTeacherWeek, getWeek, loadConfig } from "../lib/api.ts";
+import { ScheduleError, type Day, type Teacher } from "../lib/types.ts";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
   isTeacher,
   updateSchedule,
-} from "./scanner.ts";
+} from "../lib/scanner.ts";
 
 const app = express();
 const PORT = 3000;

@@ -1,4 +1,4 @@
-import { login } from "./login.ts";
+import { login } from "../lib/login.ts";
 
 const args = process.argv.slice(2);
 

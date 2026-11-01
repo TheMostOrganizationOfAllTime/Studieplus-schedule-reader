@@ -10,10 +10,10 @@ import { ScheduleError } from "./types.ts";
 import { fileURLToPath } from "node:url";
 
 // ───────────────────────── paths & constants ─────────────────────────
-const HERE = dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = HERE + "/config.json";
-const DEBUG_DIR = HERE + "/debug";
-const LOG_FILE = DEBUG_DIR + "/login.log";
+import { dataPath } from "./paths.ts";
+const CONFIG_PATH = () => dataPath("config.json");
+const DEBUG_DIR = () => dataPath("debug");
+const LOG_FILE = () => dataPath("debug", "login.log");
 
 const START_URL = "https://all.uddataplus.dk/";
 const OVERALL_TIMEOUT_MS = 90_000;
@@ -31,19 +31,18 @@ type Config = {
 };
 
 function readConfig(): Config {
-  console.log(CONFIG_PATH);
-  if (!fs.existsSync(CONFIG_PATH))
-    throw new ScheduleError(`Missing config file on ${CONFIG_PATH}`);
-  const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")) as Config;
+  if (!fs.existsSync(CONFIG_PATH()))
+    throw new ScheduleError(`Missing config file on ${CONFIG_PATH()}`);
+  const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH(), "utf8")) as Config;
   if (!cfg.username || !cfg.password)
     throw new ScheduleError("config.json needs both username and password");
   return cfg;
 }
 
 function saveConfig(patch: Partial<Config>) {
-  const current = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+  const current = JSON.parse(fs.readFileSync(CONFIG_PATH(), "utf8"));
   fs.writeFileSync(
-    CONFIG_PATH,
+    CONFIG_PATH(),
     JSON.stringify({ ...current, ...patch }, null, 2),
   );
 }
@@ -69,7 +68,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function log(msg: string) {
   const line = redact(`[${new Date().toISOString().slice(11, 23)}] ${msg}`);
   console.log(line);
-  fs.appendFileSync(LOG_FILE, line + "\n");
+  fs.appendFileSync(LOG_FILE(), line + "\n");
 }
 
 // Query strings hold session codes, so they are dropped from the log.
@@ -85,7 +84,7 @@ function short(u: string): string {
 let snapN = 0;
 async function snapshot(page: Page, label: string) {
   const base = path.join(
-    DEBUG_DIR,
+    DEBUG_DIR(),
     `${String(++snapN).padStart(2, "0")}-${label}`,
   );
   await page
@@ -179,8 +178,8 @@ async function waitForChange(
 export async function login(
   opts: { headed?: boolean; slowMo?: number; log?: boolean } = {},
 ): Promise<void> {
-  fs.rmSync(DEBUG_DIR, { recursive: true, force: true });
-  fs.mkdirSync(DEBUG_DIR, { recursive: true });
+  fs.rmSync(DEBUG_DIR(), { recursive: true, force: true });
+  fs.mkdirSync(DEBUG_DIR(), { recursive: true });
 
   const cfg = readConfig();
   secrets = [cfg.password];

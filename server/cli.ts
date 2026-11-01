@@ -2,28 +2,30 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { getRoomWeek, getTeacherWeek, getWeek, loadConfig } from "./api.ts";
+import {
+  getRoomWeek,
+  getTeacherWeek,
+  getWeek,
+  loadConfig,
+} from "../lib/api.ts";
 import {
   addDays,
   dateKey,
   mondayOf,
   parseIsoDate,
   startOfDayOf,
-} from "./dates.ts";
-import { decodeRoom, parseSchedule } from "./decoder.ts";
-import { formatRoom, formatTeacher, formatWeek } from "./format.ts";
-import { ScheduleError } from "./types.ts";
+} from "../lib/dates.ts";
+import { decodeRoom, parseSchedule } from "../lib/decoder.ts";
+import { formatRoom, formatTeacher, formatWeek } from "../lib/format.ts";
+import { ScheduleError } from "../lib/types.ts";
 import {
   compileAllSchedules,
   getLocallyStoredSchedules,
   isTeacher,
   scanRooms,
   scanTeachers,
-} from "./scanner.ts";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-
-const HERE = dirname(fileURLToPath(import.meta.url)) + "/";
+} from "../lib/scanner.ts";
+import { dataPath } from "../lib/paths.ts";
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
@@ -45,7 +47,7 @@ async function main(): Promise<void> {
   });
 
   if (values.help) {
-    console.log(readFileSync(HERE + "help.txt", "utf-8"));
+    console.log(readFileSync(dataPath("help.txt", "utf-8")));
     return;
   }
 
@@ -98,7 +100,7 @@ async function main(): Promise<void> {
 
   const firstMonday = mondayOf(day);
   if (values.class) {
-    if (!existsSync(HERE + "allSchedules.json"))
+    if (!existsSync(dataPath("allSchedules.json")))
       await compileAllSchedules(cfg, new Date(), 2);
     console.log(
       formatWeek(firstMonday, getLocallyStoredSchedules(values.class)),

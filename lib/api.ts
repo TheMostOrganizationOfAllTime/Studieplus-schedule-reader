@@ -1,8 +1,6 @@
 // Talks to Studie+: config, the request, and "fetch a week".
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { addDays, dateKey, mondayOf, startOfDayOf } from "./dates.ts";
 import { decodeRoom, decodeTeacher, parseSchedule } from "./decoder.ts";
 import {
@@ -13,8 +11,8 @@ import {
   type RoomWeek,
 } from "./types.ts";
 import { login } from "./login.ts";
+import { dataPath } from "./paths.ts";
 
-export const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = "https://all.uddataplus.dk/skema/skema/";
 const ENDPOINT = BASE + "skemaservice";
 const DEFAULT_STRONG_NAME = "0E790BF304400AEF7F91A082938908F3";
@@ -30,7 +28,7 @@ const TEACHER_FLAG = 0;
 
 /** Reads config.json (next to this file). */
 export function loadConfig(): Config {
-  const path = join(HERE, "config.json");
+  const path = dataPath("config.json");
   let raw: Record<string, unknown>;
   try {
     raw = JSON.parse(readFileSync(path, "utf-8"));
@@ -151,7 +149,7 @@ export async function getWeek(
 ): Promise<Day[]> {
   const text = await fetchWeekText(cfg, monday);
   if (saveRaw)
-    writeFileSync(join(HERE, `raw_${dateKey(monday)}.txt`), text, "utf-8");
+    writeFileSync(dataPath(`raw_${dateKey(monday)}.txt`), text, "utf-8");
   return parseSchedule(text, monday);
 }
 
@@ -165,7 +163,7 @@ export async function getRoomWeek(
   const text = await fetchRoomWeekText(cfg, roomId, monday);
   if (saveRaw)
     writeFileSync(
-      join(HERE, `raw_room${roomId}_${dateKey(monday)}.txt`),
+      dataPath(`raw_room${roomId}_${dateKey(monday)}.txt`),
       text,
       "utf-8",
     );
@@ -212,7 +210,7 @@ export async function getTeacherWeek(
   const text = await fetchTeacherWeekText(cfg, teacherId, monday);
   if (saveRaw)
     writeFileSync(
-      join(HERE, `raw_teacher${teacherId}_${dateKey(monday)}.txt`),
+      dataPath(`raw_teacher${teacherId}_${dateKey(monday)}.txt`),
       text,
       "utf-8",
     );
