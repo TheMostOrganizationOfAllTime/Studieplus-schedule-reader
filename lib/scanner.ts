@@ -23,18 +23,19 @@ export async function scanRooms(
 ): Promise<void> {
   from ??= cfg.minRoomId;
   to ??= cfg.maxRoomId;
-  const rooms: { name: string; id: number }[] = existsSync(
-    dataPath("validRooms.json"),
-  )
-    ? JSON.parse(readFileSync(dataPath("validRooms.json"), "utf8"))
-    : [];
+  const rooms: Record<string, number> = existsSync(dataPath("rooms.json"))
+    ? JSON.parse(readFileSync(dataPath("rooms.json"), "utf8"))
+    : {};
+  for (const room of Object.keys(rooms)) {
+    if (rooms[room] > from || rooms[room] < to) delete rooms[room];
+  }
 
   const ids = Array.from(
     { length: Math.max(0, to - from + 1) },
     (_, i) => from + i,
   );
 
-  const valid = new Array<string | null>(ids.length).fill(null);
+  const names = new Array<string | null>(ids.length);
   const monday = mondayOf(new Date());
 
   let nextIndex = 0;
@@ -48,7 +49,7 @@ export async function scanRooms(
       const text = await fetchRoomWeekText(cfg, id, monday);
       const room = decodeRoom(text);
 
-      if (room) valid[index] = room.name;
+      if (room) names[index] = room.name;
     }
   }
 
@@ -56,14 +57,12 @@ export async function scanRooms(
     Array.from({ length: Math.min(20, ids.length) }, () => worker()),
   );
 
-  const updatedRooms = [
-    ...rooms.filter((room) => room.id < from || room.id > to),
-    ...ids
-      .filter((_, index) => valid[index] !== null)
-      .map((id, index) => ({ id, name: valid[index]! })),
-  ].sort((a, b) => a.id - b.id);
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i];
+    if (name !== null) rooms[name] = ids[i];
+  }
 
-  writeFileSync(dataPath("validRooms.json"), JSON.stringify(updatedRooms));
+  writeFileSync(dataPath("rooms.json"), JSON.stringify(rooms));
 }
 
 export async function scanTeachers(
@@ -363,22 +362,20 @@ export function isTeacher(
 /** Checks if the input is a valid room. */
 export function isRoom(
   input: string | number,
-  valid?: { name: string; id: number }[],
+  valid?: Record<string, number>,
 ): number | null {
-  if (!valid && !existsSync(dataPath("validRooms.json")))
+  if (!valid && !existsSync(dataPath("rooms.json")))
     throw new ScheduleError("No valid rooms where provided");
 
-  valid ??= JSON.parse(readFileSync(dataPath("validRooms.json"), "utf8")) as {
-    name: string;
-    id: number;
-  }[];
-  console.log(valid);
+  valid ??= JSON.parse(readFileSync(dataPath("rooms.json"), "utf8")) as Record<
+    string,
+    number
+  >;
   if (typeof input === "string") {
-    const inputNumber = Number(input);
-    return (
-      valid.find((room) => room.name === input || room.id === inputNumber)
-        ?.id || null
-    );
+    if (valid[input] !== undefined) return valid[input];
+    if (!/^\d+$/.test(input)) return null;
+    input = Number(input);
   }
-  return valid.find((room) => room.id === input)?.id || null;
+  for (const id of Object.values(valid)) if (id === input) return id;
+  return null;
 }

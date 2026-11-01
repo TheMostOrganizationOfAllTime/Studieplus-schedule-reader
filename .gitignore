@@ -3,6 +3,6 @@ raw_*.txt
 node_modules
 roomNames.json
 teachers.json
-validRooms.json
+rooms.json
 *Schedules.json
 debug
