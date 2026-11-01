@@ -1,6 +1,11 @@
 import express from "express";
 import { addDays, mondayOf, parseIsoDate } from "../lib/dates.ts";
-import { getTeacherWeek, getWeek, loadConfig } from "../lib/api.ts";
+import {
+  getTeacherWeek,
+  getWeek,
+  loadConfig,
+  setTokenRefresher,
+} from "../lib/api.ts";
 import { ScheduleError, type Day, type Teacher } from "../lib/types.ts";
 import {
   compileAllSchedules,
@@ -8,6 +13,7 @@ import {
   isTeacher,
   updateSchedule,
 } from "../lib/scanner.ts";
+import { login } from "../lib/login.ts";
 
 const app = express();
 const PORT = 3000;
@@ -15,6 +21,11 @@ const ALLOWSHOWINGPERSONALSCHEDULE = true;
 const RECHECKTIMES = ["16:00"]; // Must be "HH:mm"
 
 const cfg = loadConfig();
+
+setTokenRefresher(async () => {
+  await login();
+  return loadConfig().utoken;
+});
 
 // Scheduler
 function getNextRun(): Date {

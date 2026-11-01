@@ -10,8 +10,14 @@ import {
   type Day,
   type RoomWeek,
 } from "./types.ts";
-import { login } from "./login.ts";
 import { dataPath } from "./paths.ts";
+
+let refreshToken: (() => Promise<string>) | null = null;
+
+/** Each app registers how it gets a fresh utoken (server: Playwright, app: ask the server / WebView). */
+export function setTokenRefresher(fn: () => Promise<string>): void {
+  refreshToken = fn;
+}
 
 const BASE = "https://all.uddataplus.dk/skema/skema/";
 const ENDPOINT = BASE + "skemaservice";
@@ -112,16 +118,22 @@ async function post(
     throw new ScheduleError(`Could not reach Studie+: ${(e as Error).message}`);
   }
   if (!response.ok) {
-    if (!depth || depth < 5) {
-      await login();
+    if (
+      (response.status === 401 || response.status === 403) &&
+      (!depth || depth < 5)
+    ) {
+      if (!refreshToken)
+        throw new ScheduleError(
+          `HTTP ${response.status}: token expired and no refresher is set.`,
+        );
       // cfg is a pointer so by updating the utoken here it will trickle upwards.
-      cfg.utoken = loadConfig().utoken;
+      cfg.utoken = await refreshToken();
       return await post(cfg, body, (depth ?? 0) + 1);
     }
 
     throw new ScheduleError(
       `HTTP ${response.status} from server. 401/403 = cookies expired or wrong; ` +
-        `500 = strong name changed (see README_SETUP.md).`,
+        `500 = strong name changed`,
     );
   }
   return response.text();

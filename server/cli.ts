@@ -7,6 +7,7 @@ import {
   getTeacherWeek,
   getWeek,
   loadConfig,
+  setTokenRefresher,
 } from "../lib/api.ts";
 import {
   addDays,
@@ -26,6 +27,12 @@ import {
   scanTeachers,
 } from "../lib/scanner.ts";
 import { dataPath } from "../lib/paths.ts";
+import { login } from "../lib/login.ts";
+
+setTokenRefresher(async () => {
+  await login();
+  return loadConfig().utoken;
+});
 
 async function main(): Promise<void> {
   // Optain arguments given when running command.
