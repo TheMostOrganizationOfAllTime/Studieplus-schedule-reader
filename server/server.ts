@@ -14,6 +14,8 @@ import {
   updateSchedule,
 } from "../lib/scanner.ts";
 import { login } from "../lib/login.ts";
+import { dataPath } from "../lib/paths.ts";
+import { existsSync, readFileSync } from "node:fs";
 
 const app = express();
 const PORT = 3000;
@@ -103,6 +105,52 @@ app.get("/api/teacher/:input", async (req, res) => {
     );
   }
   return res.status(200).json(result);
+});
+
+// /api/teachers
+app.get("/api/teachers", async (req, res) => {
+  if (existsSync(dataPath("teachers.json")))
+    return res
+      .status(200)
+      .json(
+        Object.keys(
+          JSON.parse(
+            readFileSync(dataPath("teachers.json"), "utf-8"),
+          ) as Record<string, number>,
+        ),
+      );
+  return res.status(503).send();
+});
+
+// /api/rooms
+app.get("/api/rooms", async (req, res) => {
+  if (existsSync(dataPath("rooms.json")))
+    return res
+      .status(200)
+      .json(
+        Object.keys(
+          JSON.parse(readFileSync(dataPath("rooms.json"), "utf-8")) as Record<
+            string,
+            number
+          >,
+        ),
+      );
+  return res.status(503).send();
+});
+
+// /api/classes
+app.get("/api/classes", async (req, res) => {
+  if (existsSync(dataPath("allSchedules.json")))
+    return res
+      .status(200)
+      .json(
+        Object.keys(
+          JSON.parse(
+            readFileSync(dataPath("allSchedules.json"), "utf-8"),
+          ) as Record<string, number>,
+        ).sort(),
+      );
+  return res.status(503).send();
 });
 
 // /api/student?weeks=1&from=2026-10-28
