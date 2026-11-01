@@ -6,6 +6,7 @@ export const defaultConfig: Config = {
   username: "",
   password: "",
   utoken: null,
+  url: "",
   classes: [],
   ignored: {
     rooms: [

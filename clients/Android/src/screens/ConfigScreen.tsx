@@ -79,6 +79,17 @@ export function ConfigScreen() {
         </Section>
       ) : (
         <Section title="Manual input">
+          <Text style={[ui.label, { marginBottom: 4 }]}>URL</Text>
+          <TextInput
+            style={[ui.input, { marginBottom: 16 }]}
+            placeholder="URL"
+            value={config.url}
+            onChangeText={(url) => update({ url })}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+          <Text style={[ui.label, { marginBottom: 4 }]}>Classes</Text>
           <StringListEditor
             items={config.classes}
             onChange={(classes) => update({ classes })}

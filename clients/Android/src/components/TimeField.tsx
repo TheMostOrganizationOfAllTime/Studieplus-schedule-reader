@@ -14,11 +14,6 @@ interface Props {
 export function TimeField({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
 
-  const handleChange = (e: DateTimePickerEvent, date?: Date) => {
-    setOpen(false);
-    if (e.type === "set" && date) onChange(dateToHhmm(date));
-  };
-
   return (
     <>
       <Pressable onPress={() => setOpen(true)} style={ui.input}>
@@ -29,7 +24,11 @@ export function TimeField({ value, onChange }: Props) {
           value={hhmmToDate(value)}
           mode="time"
           is24Hour
-          onChange={handleChange}
+          onValueChange={(_event, date) => {
+            setOpen(false);
+            onChange(dateToHhmm(date));
+          }}
+          onDismiss={() => setOpen(false)}
         />
       )}
     </>

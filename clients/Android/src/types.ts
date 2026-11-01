@@ -4,6 +4,7 @@ export interface Config {
   username: string;
   password: string;
   utoken: string | null;
+  url: string;
   classes: string[];
   ignored: {
     rooms: string[];
