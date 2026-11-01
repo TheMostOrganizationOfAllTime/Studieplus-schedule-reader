@@ -5,7 +5,7 @@
 // so a lesson is found by looking for known patterns of numbers and looking the strings up.
 // Everything in a lesson below is described in "file order" (the writer's order is the reverse).
 
-import { addDays, dateKey } from "./dates.ts";
+import { addDays, dateKey } from "./times.ts";
 import {
   Lesson,
   ScheduleError,

@@ -1,7 +1,7 @@
 // Talks to Studie+: config, the request, and "fetch a week".
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { addDays, dateKey, mondayOf, startOfDayOf } from "./dates.ts";
+import { addDays, dateKey, mondayOf, startOfDayOf } from "./times.ts";
 import { decodeRoom, decodeTeacher, parseSchedule } from "./decoder.ts";
 import {
   ScheduleError,

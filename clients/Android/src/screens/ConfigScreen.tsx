@@ -6,7 +6,7 @@ import { StringListEditor } from "../components/StringListEditor";
 import { TimeField } from "../components/TimeField";
 import { Section, colors, ui } from "../components/ui";
 import { useConfig } from "../config/ConfigContext";
-import { hhmmToMinutes, minutesToHhmm } from "../lib/time";
+import { hhmmToMinutes, minutesToHhmm } from "../../../../lib/times";
 
 export function ConfigScreen() {
   const { config, update } = useConfig();

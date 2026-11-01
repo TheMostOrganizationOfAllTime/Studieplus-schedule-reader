@@ -1,5 +1,5 @@
 import express from "express";
-import { addDays, mondayOf, parseIsoDate } from "../lib/dates.ts";
+import { addDays, mondayOf, parseIsoDate } from "../lib/times.ts";
 import {
   getTeacherWeek,
   getWeek,

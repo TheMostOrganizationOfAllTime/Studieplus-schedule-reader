@@ -12,7 +12,7 @@ import {
   mondayOf,
   parseIsoDate,
   startOfDayOf,
-} from "./dates.ts";
+} from "./times.ts";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { dataPath } from "./paths.ts";
 

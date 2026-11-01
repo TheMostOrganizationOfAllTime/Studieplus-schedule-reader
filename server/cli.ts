@@ -15,7 +15,7 @@ import {
   mondayOf,
   parseIsoDate,
   startOfDayOf,
-} from "../lib/dates.ts";
+} from "../lib/times.ts";
 import { decodeRoom, parseSchedule } from "../lib/decoder.ts";
 import { formatRoom, formatTeacher, formatWeek } from "../lib/format.ts";
 import { ScheduleError } from "../lib/types.ts";

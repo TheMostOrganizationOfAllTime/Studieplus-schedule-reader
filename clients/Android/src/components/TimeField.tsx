@@ -3,7 +3,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useState } from "react";
 import { Pressable, Text } from "react-native";
-import { dateToHhmm, hhmmToDate } from "../lib/time";
+import { dateToHhmm, hhmmToDate } from "../../../../lib/times";
 import { ui } from "./ui";
 
 interface Props {

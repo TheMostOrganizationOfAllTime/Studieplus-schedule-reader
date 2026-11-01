@@ -58,5 +58,20 @@ export function isoWeek(date: Date): number {
 }
 
 /** "08:15" */
-export const hhmm = (date: Date): string =>
-  `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+export const minutesToHhmm = (m: number) =>
+  `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+
+export function hhmmToMinutes(s: string): number {
+  const [h, m] = s.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+export const dateToHhmm = (d: Date) =>
+  `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+export function hhmmToDate(s: string): Date {
+  const [h, m] = s.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h ?? 0, m ?? 0, 0, 0);
+  return d;
+}
