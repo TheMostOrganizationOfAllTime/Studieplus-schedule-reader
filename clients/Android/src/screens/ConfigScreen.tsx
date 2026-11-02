@@ -1,16 +1,53 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import { hhmmToMinutes, minutesToHhmm } from "../../../../lib/times";
 import { confirmLogin } from "../api/auth";
+import { pingServer, syncLists } from "../api/server";
 import { ConditionalOffsetEditor } from "../components/ConditionalOffsetEditor";
 import { StringListEditor } from "../components/StringListEditor";
 import { TimeField } from "../components/TimeField";
 import { Section, colors, ui } from "../components/ui";
 import { useConfig } from "../config/ConfigContext";
-import { hhmmToMinutes, minutesToHhmm } from "../../../../lib/times";
+import { loadLists, type Lists } from "../config/lists";
 
 export function ConfigScreen() {
   const { config, update } = useConfig();
   const [loginAttempted, setLoginAttempted] = useState(false);
+  const [serverDown, setServerDown] = useState(false);
+  const [suggestions, setSuggestions] = useState<Lists>({
+    teachers: [],
+    rooms: [],
+    classes: [],
+  });
+
+  // Show whatever lists were saved last time.
+  useEffect(() => {
+    loadLists().then(setSuggestions);
+  }, []);
+
+  const checkServer = useCallback(async (url: string) => {
+    if (!url.trim()) {
+      setServerDown(false);
+      return;
+    }
+    if (!(await pingServer(url))) {
+      setServerDown(true);
+      return;
+    }
+    setServerDown(false);
+    const fresh = await syncLists(url);
+    setSuggestions((prev) => ({ ...prev, ...fresh }));
+  }, []);
+
+  // Check once on start and whenever the user switches back to manual input.
+  useEffect(() => {
+    if (!config.useLogin) void checkServer(config.url);
+  }, [config.useLogin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Everything below "Manual input / Unilogin" stays hidden until this is true.
+  const setupDone = config.useLogin
+    ? !!config.utoken
+    : config.url.trim() !== "" && config.classes.length > 0;
 
   const toggleLogin = (next: boolean) => {
     if (!next) {
@@ -44,10 +81,12 @@ export function ConfigScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Section title="General">
-        <View style={ui.row}>
-          <Text style={[ui.label, { flex: 1 }]}>Enabled</Text>
-          <Switch value={config.enabled} onValueChange={(v) => update({ enabled: v })} />
-        </View>
+        {setupDone && (
+          <View style={ui.row}>
+            <Text style={[ui.label, { flex: 1 }]}>Enabled</Text>
+            <Switch value={config.enabled} onValueChange={(v) => update({ enabled: v })} />
+          </View>
+        )}
         <View style={ui.row}>
           <Text style={[ui.label, { flex: 1 }]}>Use Unilogin</Text>
           <Switch value={config.useLogin} onValueChange={toggleLogin} />
@@ -81,61 +120,72 @@ export function ConfigScreen() {
         <Section title="Manual input">
           <Text style={[ui.label, { marginBottom: 4 }]}>URL</Text>
           <TextInput
-            style={[ui.input, { marginBottom: 16 }]}
+            style={ui.input}
             placeholder="URL"
             value={config.url}
             onChangeText={(url) => update({ url })}
+            onEndEditing={() => checkServer(config.url)}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
           />
-          <Text style={[ui.label, { marginBottom: 4 }]}>Classes</Text>
+          {serverDown && <Text style={ui.error}>Server inaccessible</Text>}
+          <Text style={[ui.label, { marginTop: 16, marginBottom: 4 }]}>Classes</Text>
           <StringListEditor
             items={config.classes}
             onChange={(classes) => update({ classes })}
             placeholder="Add a class"
+            suggestions={suggestions.classes}
           />
         </Section>
       )}
 
-      <Section
-        title="Ignored"
-        description="Add any rooms, subjects or teachers whose lessons you want to be ignored when determining when to wake you"
-      >
-        <Text style={ui.label}>Rooms</Text>
-        <StringListEditor
-          items={config.ignored.rooms}
-          onChange={(rooms) => update({ ignored: { ...config.ignored, rooms } })}
-          placeholder="Add a room"
-        />
-        <Text style={ui.label}>Subjects</Text>
-        <StringListEditor
-          items={config.ignored.subjects}
-          onChange={(subjects) => update({ ignored: { ...config.ignored, subjects } })}
-          placeholder="Add a subject"
-        />
-        <Text style={ui.label}>Teachers</Text>
-        <StringListEditor
-          items={config.ignored.teachers}
-          onChange={(teachers) => update({ ignored: { ...config.ignored, teachers } })}
-          placeholder="Add a teacher"
-        />
-      </Section>
+      {setupDone && (
+        <>
+          <Section
+            title="Ignored"
+            description="Add any rooms, subjects or teachers whose lessons you want to be ignored when determining when to wake you"
+          >
+            <Text style={ui.label}>Rooms</Text>
+            <StringListEditor
+              items={config.ignored.rooms}
+              onChange={(rooms) => update({ ignored: { ...config.ignored, rooms } })}
+              placeholder="Add a room"
+              suggestions={suggestions.rooms}
+            />
+            <Text style={ui.label}>Subjects</Text>
+            <StringListEditor
+              items={config.ignored.subjects}
+              onChange={(subjects) => update({ ignored: { ...config.ignored, subjects } })}
+              placeholder="Add a subject"
+            />
+            <Text style={ui.label}>Teachers</Text>
+            <StringListEditor
+              items={config.ignored.teachers}
+              onChange={(teachers) => update({ ignored: { ...config.ignored, teachers } })}
+              placeholder="Add a teacher"
+              suggestions={suggestions.teachers}
+            />
+          </Section>
 
-      <Section title="Transit Time">
-        <Text style={[ui.label, { marginBottom: 4 }]}>Time it takes to get to school (hh:mm)</Text>
-        <TimeField
-          value={minutesToHhmm(config.base)}
-          onChange={(v) => update({ base: hhmmToMinutes(v) })}
-        />
-        <Text style={[ui.label, { marginTop: 16, marginBottom: 8, fontWeight: "600" }]}>
-          Special cases
-        </Text>
-        <ConditionalOffsetEditor
-          value={config.conditionalOffset}
-          onChange={(conditionalOffset) => update({ conditionalOffset })}
-        />
-      </Section>
+          <Section title="Transit Time">
+            <Text style={[ui.label, { marginBottom: 4 }]}>
+              Time it takes to get to school (hh:mm)
+            </Text>
+            <TimeField
+              value={minutesToHhmm(config.base)}
+              onChange={(v) => update({ base: hhmmToMinutes(v) })}
+            />
+            <Text style={[ui.label, { marginTop: 16, marginBottom: 8, fontWeight: "600" }]}>
+              Special cases
+            </Text>
+            <ConditionalOffsetEditor
+              value={config.conditionalOffset}
+              onChange={(conditionalOffset) => update({ conditionalOffset })}
+            />
+          </Section>
+        </>
+      )}
     </ScrollView>
   );
 }
