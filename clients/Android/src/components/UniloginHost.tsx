@@ -4,8 +4,9 @@ import { WebView } from "react-native-webview";
 import {
   START_URL,
   attachLoginHost,
+  failLogin,
   handleLoginMessage,
-  isAllowedUrl,
+  shouldAllowNavigation,
 } from "../lib/unilogin";
 
 // Set to true to watch the login happen on screen while debugging.
@@ -39,10 +40,7 @@ export function UniloginHost() {
     >
       <WebView
         key={runId}
-        source={{
-          uri: START_URL,
-          headers: { "Cache-Control": "no-cache" },
-        }}
+        source={{ uri: START_URL, headers: { "Cache-Control": "no-cache" } }}
         cacheEnabled={false}
         cacheMode="LOAD_NO_CACHE"
         javaScriptEnabled
@@ -52,10 +50,10 @@ export function UniloginHost() {
         setSupportMultipleWindows={false}
         injectedJavaScript={script}
         onMessage={(e) => handleLoginMessage(e.nativeEvent.data)}
-        onShouldStartLoadWithRequest={(req) => {
-          const ok = isAllowedUrl(req.url);
-          console.log(`Unilogin WebView ${ok ? "allow" : "BLOCK"}`, req.url.split("?")[0]);
-          return ok;
+        onShouldStartLoadWithRequest={(req) => shouldAllowNavigation(req.url)}
+        onError={() => failLogin("unreachable")}
+        onHttpError={(e) => {
+          if (e.nativeEvent.statusCode >= 500) failLogin("unreachable");
         }}
       />
     </View>

@@ -42,6 +42,18 @@ export function IconButton(props: { name: IconName; onPress: () => void; color?:
   );
 }
 
+export function Button(props: { title: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      onPress={props.onPress}
+      disabled={props.disabled}
+      style={[styles.button, props.disabled && { opacity: 0.5 }]}
+    >
+      <Text style={styles.buttonText}>{props.title}</Text>
+    </Pressable>
+  );
+}
+
 export function Segmented<T extends string>(props: {
   options: { value: T; label: string }[];
   value: T;
@@ -78,4 +90,9 @@ const styles = StyleSheet.create({
   },
   segment: { flex: 1, paddingVertical: 8, alignItems: "center" },
   segmentActive: { backgroundColor: colors.accent },
+  button: {
+    backgroundColor: colors.accent, borderRadius: 8,
+    paddingVertical: 12, alignItems: "center", marginTop: 8,
+  },
+  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
 });

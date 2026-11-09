@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { Alert, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { hhmmToMinutes, minutesToHhmm } from "../../../../lib/times";
-import { confirmLogin } from "../api/auth";
 import { pingServer, syncLists } from "../api/server";
 import { ConditionalOffsetEditor } from "../components/ConditionalOffsetEditor";
 import { StringListEditor } from "../components/StringListEditor";
@@ -9,6 +8,8 @@ import { TimeField } from "../components/TimeField";
 import { Section, colors, ui } from "../components/ui";
 import { useConfig } from "../config/ConfigContext";
 import { loadLists, type Lists } from "../config/lists";
+import { ScheduleUpdateSection } from "../components/ScheduleUpdateSection";
+import { confirmLogin, type LoginFailure } from "../api/auth";
 
 export function ConfigScreen() {
   const { config, update } = useConfig();
@@ -65,22 +66,38 @@ export function ConfigScreen() {
     );
   };
 
-  const loggingIn = useRef(false);
+    const loggingIn = useRef(false);
   const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState<{
+    reason: LoginFailure;
+    message: string;
+  } | null>(null);
 
   const tryLogin = async () => {
     if (loggingIn.current || !config.username || !config.password) return;
     loggingIn.current = true;
     setLoginBusy(true);
+    setLoginError(null);
     try {
-      const token = await confirmLogin(config.username, config.password);
-      update({ utoken: token });
-      setLoginAttempted(true);
+      const result = await confirmLogin(config.username, config.password);
+      if (result.ok) {
+        update({ utoken: result.token });
+      } else {
+        update({ utoken: null });
+        setLoginError({ reason: result.reason, message: result.message });
+      }
     } finally {
       loggingIn.current = false;
       setLoginBusy(false);
     }
   };
+
+  const usernameError =
+    loginError?.reason === "invalid-username" ? loginError.message : null;
+  const passwordError =
+    loginError?.reason === "invalid-password" ? loginError.message : null;
+  const generalError =
+    loginError && !usernameError && !passwordError ? loginError.message : null;
 
   const loginFailed = loginAttempted && !config.utoken;
 
@@ -106,28 +123,34 @@ export function ConfigScreen() {
       {config.useLogin ? (
         <Section title="Unilogin">
           <TextInput
-            style={[ui.input, { marginBottom: 8 }]}
+            style={ui.input}
             placeholder="Username"
             value={config.username}
-            onChangeText={(username) => update({ username })}
+            onChangeText={(username) => {
+              update({ username });
+              setLoginError(null);
+            }}
             onEndEditing={tryLogin}
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {usernameError && <Text style={ui.error}>{usernameError}</Text>}
           <TextInput
-            style={ui.input}
+            style={[ui.input, { marginTop: 8 }]}
             placeholder="Password"
             value={config.password}
-            onChangeText={(password) => update({ password })}
+            onChangeText={(password) => {
+              update({ password });
+              setLoginError(null);
+            }}
             onEndEditing={tryLogin}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {passwordError && <Text style={ui.error}>{passwordError}</Text>}
           {loginBusy && <Text style={[ui.label, { marginTop: 4 }]}>Logging in…</Text>}
-          {loginFailed && !loginBusy && (
-            <Text style={ui.error}>Incorrect username or password</Text>
-          )}
+          {generalError && <Text style={ui.error}>{generalError}</Text>}
         </Section>
       ) : (
         <Section title="Manual input">
@@ -153,6 +176,7 @@ export function ConfigScreen() {
         </Section>
       )}
 
+      {config.useLogin && !!config.utoken && <ScheduleUpdateSection />}
       {setupDone && (
         <>
           <Section

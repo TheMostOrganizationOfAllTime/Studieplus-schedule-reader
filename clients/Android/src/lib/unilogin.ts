@@ -10,6 +10,27 @@ const STUDIE_HOST = "all.uddataplus.dk";
 const OVERALL_TIMEOUT_MS = 90_000;
 const POLL_MS = 500;
 
+// ───────────────────────── results ─────────────────────────
+
+export type LoginFailure =
+  | "invalid-username"
+  | "invalid-password"
+  | "unreachable"
+  | "internal";
+
+export type LoginResult =
+  | { ok: true; token: string }
+  | { ok: false; reason: LoginFailure };
+
+export const loginFailureMessage: Record<LoginFailure, string> = {
+  "invalid-username": "Incorrect username",
+  "invalid-password": "Incorrect password",
+  unreachable: "Couldn't reach Studie+ servers",
+  internal: "Internal error",
+};
+
+// ───────────────────────── navigation rules ─────────────────────────
+
 /** The WebView may only visit Studie+ and Unilogin pages, since credentials get typed into them. */
 export function isAllowedUrl(url: string): boolean {
   if (url === "about:blank") return true;
@@ -24,6 +45,25 @@ export function isAllowedUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Decides every navigation of the WebView. Also notices Studie+'s maintenance page. */
+export function shouldAllowNavigation(url: string): boolean {
+  const shown = url.split("?")[0];
+  let hostname = "";
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    // not a valid URL, isAllowedUrl will reject it
+  }
+  if (hostname.endsWith("statushub.io")) {
+    console.log("Unilogin WebView: redirected to Studie+'s status page", shown);
+    failLogin("unreachable");
+    return false;
+  }
+  const ok = isAllowedUrl(url);
+  console.log(`Unilogin WebView ${ok ? "allow" : "BLOCK"}`, shown);
+  return ok;
 }
 
 // ───────────────────────── the script that runs inside the pages ─────────────────────────
@@ -69,9 +109,14 @@ function buildLoginScript(
   log("page " + location.hostname + location.pathname);
 
   var timer = setInterval(function () {
-    var onCredentialPage = visible($("input#username")) || visible($('input[name="password"]'));
+    var onPasswordPage = visible($('input[name="password"]'));
+    var onCredentialPage = visible($("input#username")) || onPasswordPage;
     var err = fieldError();
-    if (err && onCredentialPage) { stop(); send({ type: "rejected", message: err }); return; }
+    if (err && onCredentialPage) {
+      stop();
+      send({ type: "rejected", message: err, field: onPasswordPage ? "password" : "username" });
+      return;
+    }
 
     if (acted) {
       if (Date.now() - started > 20000) { stop(); send({ type: "stuck", state: acted }); }
@@ -107,7 +152,7 @@ function buildLoginScript(
       log("username");
       fill($("input#username"), USERNAME);
       clickLater($("button.js-cta-submit"));
-    } else if (visible($('input[name="password"]'))) {
+    } else if (onPasswordPage) {
       // The password is only ever submitted once, so a wrong password cannot lock the account.
       var already = false;
       try { already = !!sessionStorage.getItem("uniloginPwSent"); } catch (e) {}
@@ -133,10 +178,15 @@ export interface LoginHost {
 }
 
 let host: LoginHost | null = null;
-let finishCurrent: ((token: string | null) => void) | null = null;
+let finishCurrent: ((result: LoginResult) => void) | null = null;
 
 export function attachLoginHost(h: LoginHost | null): void {
   host = h;
+}
+
+/** Ends the running login attempt (if any) with a failure. */
+export function failLogin(reason: LoginFailure): void {
+  finishCurrent?.({ ok: false, reason });
 }
 
 async function readUtoken(): Promise<string | null> {
@@ -144,45 +194,50 @@ async function readUtoken(): Promise<string | null> {
   return cookies["utoken"]?.value || null;
 }
 
-/**
- * Logs in through Unilogin and returns the utoken, or null if the login failed
- * (wrong username/password, timeout, or the page changed).
- */
+/** Logs in through Unilogin. Never throws: failures come back as { ok: false, reason }. */
 export async function login(
   username: string,
   password: string,
   instnr: string = DEFAULT_INSTNR,
-): Promise<string | null> {
-  if (!host) throw new Error("Unilogin host is not mounted");
+): Promise<LoginResult> {
+  if (!host) return { ok: false, reason: "internal" };
   const currentHost = host;
-  finishCurrent?.(null); // cancel an earlier attempt that is still running
+  failLogin("internal"); // cancel an earlier attempt that is still running
 
-  // Start from a clean slate (like Playwright's fresh context), then set instnr like lib/login.ts.
-  await CookieManager.clearAll();
-  await CookieManager.set(START_URL, {
-    name: "instnr",
-    value: instnr,
-    domain: STUDIE_HOST,
-    path: "/",
-    secure: true,
-  });
+  try {
+    // Start from a clean slate (like Playwright's fresh context), then set instnr like lib/login.ts.
+    await CookieManager.clearAll();
+    await CookieManager.set(START_URL, {
+      name: "instnr",
+      value: instnr,
+      domain: STUDIE_HOST,
+      path: "/",
+      secure: true,
+    });
+  } catch (e) {
+    console.warn("Unilogin: could not prepare cookies", e);
+    return { ok: false, reason: "internal" };
+  }
 
   return new Promise((resolve) => {
     let done = false;
-    const finish = (token: string | null) => {
+    const finish = (result: LoginResult) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
       clearInterval(poll);
       finishCurrent = null;
       currentHost.stop();
-      resolve(token);
+      resolve(result);
     };
-    const timer = setTimeout(() => finish(null), OVERALL_TIMEOUT_MS);
+    const timer = setTimeout(
+      () => finish({ ok: false, reason: "unreachable" }), // took far too long
+      OVERALL_TIMEOUT_MS,
+    );
     const poll = setInterval(async () => {
       try {
         const token = await readUtoken();
-        if (token) finish(token);
+        if (token) finish({ ok: true, token });
       } catch {
         // try again on the next tick
       }
@@ -194,7 +249,13 @@ export async function login(
 
 /** Called by <UniloginHost/> for every message the script sends. */
 export function handleLoginMessage(raw: string): void {
-  let msg: { type?: string; message?: string; state?: string; text?: string };
+  let msg: {
+    type?: string;
+    message?: string;
+    state?: string;
+    text?: string;
+    field?: string;
+  };
   try {
     msg = JSON.parse(raw);
   } catch {
@@ -205,12 +266,14 @@ export function handleLoginMessage(raw: string): void {
       console.log(`[unilogin page] ${msg.text}`);
       break;
     case "rejected":
-      console.log(`Unilogin rejected the login: ${msg.message}`);
-      finishCurrent?.(null);
+      console.log(`Unilogin rejected the ${msg.field}: ${msg.message}`);
+      failLogin(
+        msg.field === "password" ? "invalid-password" : "invalid-username",
+      );
       break;
     case "stuck":
       console.log(`Unilogin login got stuck in state "${msg.state}"`);
-      finishCurrent?.(null);
+      failLogin("internal");
       break;
   }
 }
