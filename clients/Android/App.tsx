@@ -5,6 +5,7 @@ import { Header } from "./src/components/Header";
 import { ConfigProvider } from "./src/config/ConfigContext";
 import { ConfigScreen } from "./src/screens/ConfigScreen";
 import { ScheduleScreen } from "./src/screens/ScheduleScreen";
+import { UniloginHost } from "./src/components/UniloginHost";
 
 type Screen = "config" | "schedule";
 
@@ -21,6 +22,7 @@ export default function App() {
             onIconPress={() => setScreen(screen === "config" ? "schedule" : "config")}
           />
           {screen === "config" ? <ConfigScreen /> : <ScheduleScreen />}
+          <UniloginHost />
         </SafeAreaView>
         <StatusBar style="dark" />
       </ConfigProvider>

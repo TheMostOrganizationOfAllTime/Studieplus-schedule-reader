@@ -5,9 +5,8 @@ import {
   type Page,
 } from "playwright";
 import fs from "node:fs";
-import path, { dirname } from "node:path";
+import path from "node:path";
 import { ScheduleError } from "./types.ts";
-import { fileURLToPath } from "node:url";
 
 // ───────────────────────── paths & constants ─────────────────────────
 import { dataPath } from "./paths.ts";

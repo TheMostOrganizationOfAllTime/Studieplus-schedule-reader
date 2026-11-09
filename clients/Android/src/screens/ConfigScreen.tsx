@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Alert, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { hhmmToMinutes, minutesToHhmm } from "../../../../lib/times";
 import { confirmLogin } from "../api/auth";
@@ -65,11 +65,21 @@ export function ConfigScreen() {
     );
   };
 
+  const loggingIn = useRef(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+
   const tryLogin = async () => {
-    if (!config.username || !config.password) return;
-    const token = await confirmLogin(config.username, config.password);
-    update({ utoken: token });
-    setLoginAttempted(true);
+    if (loggingIn.current || !config.username || !config.password) return;
+    loggingIn.current = true;
+    setLoginBusy(true);
+    try {
+      const token = await confirmLogin(config.username, config.password);
+      update({ utoken: token });
+      setLoginAttempted(true);
+    } finally {
+      loggingIn.current = false;
+      setLoginBusy(false);
+    }
   };
 
   const loginFailed = loginAttempted && !config.utoken;
@@ -114,7 +124,10 @@ export function ConfigScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {loginFailed && <Text style={ui.error}>Incorrect username or password</Text>}
+          {loginBusy && <Text style={[ui.label, { marginTop: 4 }]}>Logging in…</Text>}
+          {loginFailed && !loginBusy && (
+            <Text style={ui.error}>Incorrect username or password</Text>
+          )}
         </Section>
       ) : (
         <Section title="Manual input">
