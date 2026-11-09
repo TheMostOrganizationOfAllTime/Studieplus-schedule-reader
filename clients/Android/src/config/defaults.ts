@@ -23,4 +23,5 @@ export const defaultConfig: Config = {
   },
   base: 30,
   conditionalOffset: {},
+  scheduleUpdate: { mode: "times", interval: "3:00", times: ["16:00"] },
 };

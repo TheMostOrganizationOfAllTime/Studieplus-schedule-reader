@@ -125,14 +125,14 @@ export async function compileAllSchedules(
   if (weeks <= 0)
     throw new ScheduleError("weeks must be a positive whole number.");
 
-  if (!existsSync(dataPath("validRooms.json")))
+  if (!existsSync(dataPath("rooms.json")))
     await scanRooms(cfg, scanRange?.from, scanRange?.to);
-  const ids: number[] = (
-    JSON.parse(readFileSync(dataPath("validRooms.json"), "utf8")) as {
-      id: number;
-      name: string;
-    }[]
-  ).map((room) => room.id);
+  const ids: number[] = Object.values(
+    JSON.parse(readFileSync(dataPath("rooms.json"), "utf8")) as Record<
+      string,
+      number
+    >,
+  );
 
   const schedules: Record<string, Record<string, Lesson[]>> = {};
   const firstMonday = mondayOf(date);

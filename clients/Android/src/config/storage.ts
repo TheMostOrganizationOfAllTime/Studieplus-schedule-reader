@@ -15,6 +15,10 @@ export async function loadConfig(): Promise<Config> {
       ...defaultConfig,
       ...saved,
       ignored: { ...defaultConfig.ignored, ...saved.ignored },
+      scheduleUpdate: {
+        ...defaultConfig.scheduleUpdate,
+        ...saved.scheduleUpdate,
+      },
       password,
     };
   } catch {
