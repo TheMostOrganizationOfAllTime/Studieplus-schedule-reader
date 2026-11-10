@@ -12,6 +12,8 @@ export interface Config {
   username: string;
   password: string;
   utoken: string | null;
+  strongName: string;
+  permutation: string;
   url: string;
   classes: string[];
   ignored: {

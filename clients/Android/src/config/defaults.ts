@@ -6,6 +6,8 @@ export const defaultConfig: Config = {
   username: "",
   password: "",
   utoken: null,
+  strongName: "",
+  permutation: "",
   url: "",
   classes: [],
   ignored: {

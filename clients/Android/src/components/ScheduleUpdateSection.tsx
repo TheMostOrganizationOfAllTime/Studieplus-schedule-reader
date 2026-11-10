@@ -22,7 +22,17 @@ export function ScheduleUpdateSection() {
     setStatus(null);
     try {
       const result = await updateSchedule(config);
-      if (result.utoken !== config.utoken) update({ utoken: result.utoken });
+      if (
+        result.utoken !== config.utoken ||
+        result.strongName !== config.strongName ||
+        result.permutation !== config.permutation
+      ) {
+        update({
+          utoken: result.utoken,
+          strongName: result.strongName,
+          permutation: result.permutation,
+        });
+      }
       setStatus({ ok: true, text: `Updated ${result.files.length} weeks` });
     } catch (e) {
       setStatus({ ok: false, text: e instanceof Error ? e.message : "Internal error" });

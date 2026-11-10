@@ -1,9 +1,14 @@
-import { login, loginFailureMessage, type LoginFailure } from "../lib/unilogin";
+import {
+  login,
+  loginFailureMessage,
+  type LoginFailure,
+  type StudieParams,
+} from "../lib/unilogin";
 
 export type { LoginFailure };
 
 export type ConfirmLoginResult =
-  | { ok: true; token: string }
+  | { ok: true; token: string; params: StudieParams | null }
   | { ok: false; reason: LoginFailure; message: string };
 
 export async function confirmLogin(

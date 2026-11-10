@@ -2,32 +2,32 @@ import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { WebView } from "react-native-webview";
 import {
-  START_URL,
   attachLoginHost,
   failLogin,
   handleLoginMessage,
   shouldAllowNavigation,
+  type HostJob,
 } from "../lib/unilogin";
 
 // Set to true to watch the login happen on screen while debugging.
 const SHOW_FOR_DEBUGGING = false;
 
 export function UniloginHost() {
-  const [script, setScript] = useState<string | null>(null);
+  const [job, setJob] = useState<HostJob | null>(null);
   const [runId, setRunId] = useState(0);
 
   useEffect(() => {
     attachLoginHost({
-      start: (s) => {
-        setRunId((n) => n + 1);
-        setScript(s);
+      start: (j) => {
+        setRunId((n) => n + 1); // a new key gives a fresh WebView for every job
+        setJob(j);
       },
-      stop: () => setScript(null),
+      stop: () => setJob(null),
     });
     return () => attachLoginHost(null);
   }, []);
 
-  if (!script) return null;
+  if (!job) return null;
 
   return (
     <View
@@ -40,7 +40,7 @@ export function UniloginHost() {
     >
       <WebView
         key={runId}
-        source={{ uri: START_URL, headers: { "Cache-Control": "no-cache" } }}
+        source={{ uri: job.uri, headers: { "Cache-Control": "no-cache" } }}
         cacheEnabled={false}
         cacheMode="LOAD_NO_CACHE"
         javaScriptEnabled
@@ -48,7 +48,8 @@ export function UniloginHost() {
         thirdPartyCookiesEnabled
         sharedCookiesEnabled
         setSupportMultipleWindows={false}
-        injectedJavaScript={script}
+        injectedJavaScriptBeforeContentLoaded={job.beforeScript}
+        injectedJavaScript={job.script}
         onMessage={(e) => handleLoginMessage(e.nativeEvent.data)}
         onShouldStartLoadWithRequest={(req) => shouldAllowNavigation(req.url)}
         onError={() => failLogin("unreachable")}

@@ -9,6 +9,9 @@ export const DEFAULT_INSTNR = "281075"; // Aarhus Tech, same default as lib/logi
 const STUDIE_HOST = "all.uddataplus.dk";
 const OVERALL_TIMEOUT_MS = 90_000;
 const POLL_MS = 500;
+const SKEMA_URL = "https://all.uddataplus.dk/skema/";
+const SKEMA_SERVICE = "dk.uddata.services.interfaces.SkemaService";
+const CAPTURE_TIMEOUT_MS = 20_000;
 
 // ───────────────────────── results ─────────────────────────
 
@@ -18,8 +21,18 @@ export type LoginFailure =
   | "unreachable"
   | "internal";
 
-export type LoginResult =
+/** What the /skema/ page sends when it talks to the schedule service. */
+export interface StudieParams {
+  strongName: string;
+  permutation: string;
+}
+
+type CredentialResult =
   | { ok: true; token: string }
+  | { ok: false; reason: LoginFailure };
+
+export type LoginResult =
+  | { ok: true; token: string; params: StudieParams | null }
   | { ok: false; reason: LoginFailure };
 
 export const loginFailureMessage: Record<LoginFailure, string> = {
@@ -169,16 +182,58 @@ true;
 `;
 }
 
+// ───────────────────────── reading strongName / permutation ─────────────────────────
+
+const CAPTURE_HOOK = String.raw`
+(function () {
+  if (window.__studieCapture) return;
+  window.__studieCapture = true;
+  var SERVICE = ${JSON.stringify(SKEMA_SERVICE)};
+
+  function report(permutation, body) {
+    if (typeof body !== "string") return;
+    // GWT-RPC body: 7|0|<count>|<module base>|<strong name>|<service interface>|<method>|...
+    var parts = body.split("|");
+    if (parts[5] !== SERVICE || !/^[0-9A-Fa-f]{32}$/.test(parts[4])) return;
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: "params", strongName: parts[4], permutation: permutation || ""
+    }));
+  }
+
+  var setHeader = XMLHttpRequest.prototype.setRequestHeader;
+  var send = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
+    if (String(name).toLowerCase() === "x-gwt-permutation") this.__permutation = value;
+    return setHeader.apply(this, arguments);
+  };
+  XMLHttpRequest.prototype.send = function (body) {
+    try { report(this.__permutation, body); } catch (e) {}
+    return send.apply(this, arguments);
+  };
+})();
+true;
+`;
+
 // ───────────────────────── the login function ─────────────────────────
+
+/** A page for the hidden WebView to load. */
+export interface HostJob {
+  uri: string;
+  /** Runs after each page has loaded. */
+  script?: string;
+  /** Runs before the page's own scripts. */
+  beforeScript?: string;
+}
 
 /** Implemented by <UniloginHost/>, which owns the hidden WebView. */
 export interface LoginHost {
-  start: (script: string) => void;
+  start: (job: HostJob) => void;
   stop: () => void;
 }
 
 let host: LoginHost | null = null;
-let finishCurrent: ((result: LoginResult) => void) | null = null;
+let finishCurrent: ((result: CredentialResult) => void) | null = null;
+let finishCapture: ((params: StudieParams | null) => void) | null = null;
 
 export function attachLoginHost(h: LoginHost | null): void {
   host = h;
@@ -194,12 +249,21 @@ async function readUtoken(): Promise<string | null> {
   return cookies["utoken"]?.value || null;
 }
 
-/** Logs in through Unilogin. Never throws: failures come back as { ok: false, reason }. */
-export async function login(
+const setInstnrCookie = (instnr: string) =>
+  CookieManager.set(START_URL, {
+    name: "instnr",
+    value: instnr,
+    domain: STUDIE_HOST,
+    path: "/",
+    secure: true,
+  });
+
+/** Step 1: the Unilogin flow, ending with the utoken cookie. */
+async function loginWithCredentials(
   username: string,
   password: string,
-  instnr: string = DEFAULT_INSTNR,
-): Promise<LoginResult> {
+  instnr: string,
+): Promise<CredentialResult> {
   if (!host) return { ok: false, reason: "internal" };
   const currentHost = host;
   failLogin("internal"); // cancel an earlier attempt that is still running
@@ -207,13 +271,7 @@ export async function login(
   try {
     // Start from a clean slate (like Playwright's fresh context), then set instnr like lib/login.ts.
     await CookieManager.clearAll();
-    await CookieManager.set(START_URL, {
-      name: "instnr",
-      value: instnr,
-      domain: STUDIE_HOST,
-      path: "/",
-      secure: true,
-    });
+    await setInstnrCookie(instnr);
   } catch (e) {
     console.warn("Unilogin: could not prepare cookies", e);
     return { ok: false, reason: "internal" };
@@ -221,7 +279,7 @@ export async function login(
 
   return new Promise((resolve) => {
     let done = false;
-    const finish = (result: LoginResult) => {
+    const finish = (result: CredentialResult) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
@@ -243,8 +301,59 @@ export async function login(
       }
     }, POLL_MS);
     finishCurrent = finish;
-    currentHost.start(buildLoginScript(username, password, instnr));
+    currentHost.start({
+      uri: START_URL,
+      script: buildLoginScript(username, password, instnr),
+    });
   });
+}
+
+/** Step 2: open /skema/ while logged in and read strongName + permutation from its first schedule call. */
+async function captureParams(instnr: string): Promise<StudieParams | null> {
+  if (!host) return null;
+  const currentHost = host;
+  try {
+    // The Studie+ start page overwrites this cookie with its default school; /skema/ needs ours.
+    await setInstnrCookie(instnr);
+  } catch (e) {
+    console.warn("Unilogin: could not reset the instnr cookie", e);
+  }
+
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (params: StudieParams | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      finishCapture = null;
+      currentHost.stop();
+      resolve(params);
+    };
+    const timer = setTimeout(() => {
+      console.warn(
+        "Unilogin: no schedule request seen on /skema/, strongName/permutation not updated",
+      );
+      finish(null);
+    }, CAPTURE_TIMEOUT_MS);
+    finishCapture = finish;
+    currentHost.start({ uri: SKEMA_URL, beforeScript: CAPTURE_HOOK });
+  });
+}
+
+/**
+ * Logs in through Unilogin, then reads strongName and permutation from /skema/.
+ * Never throws: failures come back as { ok: false, reason }. `params` is null if
+ * the login worked but the two values couldn't be read.
+ */
+export async function login(
+  username: string,
+  password: string,
+  instnr: string = DEFAULT_INSTNR,
+): Promise<LoginResult> {
+  finishCapture?.(null); // cancel an earlier capture that is still running
+  const result = await loginWithCredentials(username, password, instnr);
+  if (!result.ok) return result;
+  return { ...result, params: await captureParams(instnr) };
 }
 
 /** Called by <UniloginHost/> for every message the script sends. */
@@ -255,6 +364,8 @@ export function handleLoginMessage(raw: string): void {
     state?: string;
     text?: string;
     field?: string;
+    strongName?: string;
+    permutation?: string;
   };
   try {
     msg = JSON.parse(raw);
@@ -274,6 +385,17 @@ export function handleLoginMessage(raw: string): void {
     case "stuck":
       console.log(`Unilogin login got stuck in state "${msg.state}"`);
       failLogin("internal");
+      break;
+    case "params":
+      if (msg.strongName) {
+        console.log(
+          `Studie+ params: strongName=${msg.strongName} permutation=${msg.permutation || "(none)"}`,
+        );
+        finishCapture?.({
+          strongName: msg.strongName,
+          permutation: msg.permutation ?? "",
+        });
+      }
       break;
   }
 }

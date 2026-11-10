@@ -81,7 +81,10 @@ export function ConfigScreen() {
     try {
       const result = await confirmLogin(config.username, config.password);
       if (result.ok) {
-        update({ utoken: result.token });
+        update({
+          utoken: result.token,
+          ...(result.params ?? {}), // strongName + permutation, when they could be read
+        });
       } else {
         update({ utoken: null });
         setLoginError({ reason: result.reason, message: result.message });

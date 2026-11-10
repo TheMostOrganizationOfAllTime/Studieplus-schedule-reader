@@ -12,10 +12,10 @@ import type { Config } from "../types";
 import { DEFAULT_INSTNR, login, loginFailureMessage } from "./unilogin";
 
 export interface UpdateResult {
-  /** The files that were written, e.g. "schedule_2026-11-09.json". */
   files: string[];
-  /** The utoken after the update (it changes if it expired and we logged in again). */
   utoken: string;
+  strongName: string;
+  permutation: string;
 }
 
 /** "schedule_2026-11-09.json": one file per week, named after that week's Monday. */
@@ -66,18 +66,21 @@ async function updateWithUnilogin(config: Config): Promise<UpdateResult> {
   const cfg: LibConfig = {
     instnr: DEFAULT_INSTNR,
     utoken: config.utoken,
-    permutation: "",
-    strongName: "",
+    permutation: config.permutation,
+    strongName: config.strongName,
     minRoomId: 0,
     maxRoomId: 0,
     minTeacherId: 0,
     maxTeacherId: 0,
   };
 
-  // If Studie+ answers 401/403, api.ts calls this to get a fresh token and retries.
   setTokenRefresher(async () => {
     const result = await login(config.username, config.password);
     if (!result.ok) throw new Error(loginFailureMessage[result.reason]);
+    if (result.params) {
+      cfg.strongName = result.params.strongName;
+      cfg.permutation = result.params.permutation;
+    }
     return result.token;
   });
 
@@ -91,9 +94,14 @@ async function updateWithUnilogin(config: Config): Promise<UpdateResult> {
   }
   for (const { monday, days } of weeks) saveWeek(monday, days);
 
-  return { files: mondays.map(weekFileName), utoken: cfg.utoken };
+  return {
+    files: mondays.map(weekFileName),
+    utoken: cfg.utoken,
+    strongName: cfg.strongName,
+    permutation: cfg.permutation,
+  };
 }
 
 async function updateManually(_config: Config): Promise<UpdateResult> {
-  throw new Error("Updating without Unilogin isn't supported yet");
+  throw new Error("Updating without Unilogin is not yet supported");
 }
